@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import os
 import sys
+import time
 from collections import OrderedDict
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
@@ -125,9 +126,12 @@ def main() -> None:
         dataset_split="train",
     )
     metrics_csv = os.path.join(cfg.artifact_dir, "train_metrics.csv")
+    step_timing_csv = os.path.join(cfg.artifact_dir, "step_timing.csv")
+    epoch_timing_csv = os.path.join(cfg.artifact_dir, "epoch_timing.csv")
 
     stop_requested = False
     best_ckpt_path = ""
+    prev_step_end = time.perf_counter()
     for epoch in range(clock.epoch, cfg.nr_epochs + 1):
         use_case.train()
         pbar = tqdm(train_loader)
@@ -135,7 +139,10 @@ def main() -> None:
         a2d_mode = getattr(cfg, "use_hard_geom_bce", False) or getattr(
             cfg, "use_corrected_line_start", False
         )
+        epoch_step_times = []
         for batch_idx, batch in enumerate(pbar):
+            iter_start = time.perf_counter()
+            data_time_s = iter_start - prev_step_end
             optimizer.zero_grad()
             should_log = (clock.step % cfg.log_frequency == 0)
             out = use_case.execute(
@@ -200,10 +207,48 @@ def main() -> None:
                     val_tb.add_scalar(key, float(value.item() if hasattr(value, "item") else value), clock.step)
                 use_case.train()
 
+            iter_end = time.perf_counter()
+            step_time_s = iter_end - iter_start
+            epoch_step_times.append(step_time_s)
+            append_csv_row(
+                step_timing_csv,
+                {
+                    "epoch": epoch,
+                    "step": clock.step,
+                    "batch_idx": batch_idx,
+                    "step_time_s": round(step_time_s, 4),
+                    "data_time_s": round(data_time_s, 4),
+                },
+            )
+            prev_step_end = iter_end
+
             clock.tick()
             if cfg.max_steps and clock.step >= cfg.max_steps:
                 stop_requested = True
                 break
+
+        if epoch_step_times:
+            epoch_time_s = sum(epoch_step_times)
+            append_csv_row(
+                epoch_timing_csv,
+                {
+                    "epoch": epoch,
+                    "steps": len(epoch_step_times),
+                    "epoch_time_s": round(epoch_time_s, 2),
+                    "mean_step_time_s": round(epoch_time_s / len(epoch_step_times), 4),
+                    "min_step_time_s": round(min(epoch_step_times), 4),
+                    "max_step_time_s": round(max(epoch_step_times), 4),
+                },
+            )
+            print(
+                "Epoch {} timing: {:.1f}s total, {:.3f}s/step mean (min {:.3f}s, max {:.3f}s)".format(
+                    epoch,
+                    epoch_time_s,
+                    epoch_time_s / len(epoch_step_times),
+                    min(epoch_step_times),
+                    max(epoch_step_times),
+                )
+            )
 
         latest_path = save_ckpt(use_case, optimizer, scheduler, clock, cfg, "latest")
         best_ckpt_path = latest_path

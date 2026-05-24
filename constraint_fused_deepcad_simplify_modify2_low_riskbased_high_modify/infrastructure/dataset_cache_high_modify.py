@@ -9,7 +9,8 @@ import torch
 
 from utils import ensure_dir
 
-CACHE_VERSION = 1
+CACHE_FORMAT_VERSION = 2
+CACHE_KEY_SCHEMA = 1
 TENSOR_FIELDS = (
     "command",
     "args",
@@ -31,7 +32,7 @@ TENSOR_FIELDS = (
 
 def build_dataset_cache_key(config) -> str:
     payload = {
-        "version": CACHE_VERSION,
+        "version": CACHE_KEY_SCHEMA,
         "angle_thresh": float(config.angle_thresh),
         "dist_thresh": float(config.dist_thresh),
         "grid_size": int(config.grid_size),
@@ -57,6 +58,27 @@ def _safe_cache_filename(data_id: str) -> str:
     return "{}.pt".format(safe)
 
 
+def build_source_stat(h5_path: str) -> Dict[str, int] | None:
+    try:
+        st = os.stat(h5_path)
+    except OSError:
+        return None
+    return {"mtime_ns": int(st.st_mtime_ns), "size": int(st.st_size)}
+
+
+def source_stat_matches(stored: Dict[str, Any] | None, current: Dict[str, int] | None) -> bool:
+    if not stored or current is None:
+        return False
+    return int(stored.get("mtime_ns", -1)) == current["mtime_ns"] and int(stored.get("size", -1)) == current["size"]
+
+
+def _invalidate_cached_file(path: str) -> None:
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
 def resolve_cached_sample_path(config, phase: str, data_id: str) -> str:
     return os.path.join(resolve_dataset_cache_dir(config, phase), _safe_cache_filename(data_id))
 
@@ -70,28 +92,41 @@ def clone_sample(sample: Dict[str, Any]) -> Dict[str, Any]:
     return cloned
 
 
-def load_cached_sample(path: str) -> Dict[str, Any] | None:
+def load_cached_sample(
+    path: str,
+    *,
+    clone: bool = True,
+    current_source_stat: Dict[str, int] | None,
+) -> Dict[str, Any] | None:
     if not os.path.isfile(path):
         return None
     try:
         payload = torch.load(path, map_location="cpu")
-        if payload.get("version") != CACHE_VERSION:
+        if payload.get("version") != CACHE_FORMAT_VERSION:
+            _invalidate_cached_file(path)
             return None
-        return clone_sample(payload["sample"])
+        if not source_stat_matches(payload.get("source_stat"), current_source_stat):
+            _invalidate_cached_file(path)
+            return None
+        sample = payload["sample"]
+        return clone_sample(sample) if clone else sample
     except (OSError, RuntimeError, KeyError, TypeError, ValueError):
-        try:
-            os.remove(path)
-        except OSError:
-            pass
+        _invalidate_cached_file(path)
         return None
 
 
-def save_cached_sample(path: str, sample: Dict[str, Any]) -> None:
+def save_cached_sample(path: str, sample: Dict[str, Any], source_stat: Dict[str, int] | None) -> None:
     if os.path.isfile(path):
+        return
+    if source_stat is None:
         return
     ensure_dir(os.path.dirname(path))
     tmp_path = "{}.tmp.{}".format(path, os.getpid())
-    payload = {"version": CACHE_VERSION, "sample": clone_sample(sample)}
+    payload = {
+        "version": CACHE_FORMAT_VERSION,
+        "source_stat": source_stat,
+        "sample": clone_sample(sample),
+    }
     try:
         torch.save(payload, tmp_path)
         os.replace(tmp_path, path)
