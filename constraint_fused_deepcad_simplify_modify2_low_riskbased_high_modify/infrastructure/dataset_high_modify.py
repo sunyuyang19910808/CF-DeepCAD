@@ -10,6 +10,13 @@ from cadlib.macro import EOS_VEC
 from model.model_utils import _get_group_mask
 
 from constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify.domain.services import iter_line_command_positions
+from constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify.infrastructure.dataset_cache_high_modify import (
+    clone_sample,
+    load_cached_sample,
+    resolve_cached_sample_path,
+    resolve_dataset_cache_dir,
+    save_cached_sample,
+)
 from constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify.infrastructure.repository import CadVectorRepository
 from constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify.sketch_preparation.batch_assembler_high_modify import (
     ConstraintBatchAssemblerHighModify,
@@ -38,9 +45,38 @@ class CADDatasetHighModify(Dataset):
             seq_len=config.max_total_len,
         )
         self._warned_bad_samples = set()
+        self.cache_mode = getattr(config, "dataset_cache", "off")
+        self._memory_cache: dict[str, dict] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
+        if self.cache_mode == "disk":
+            self._disk_cache_dir = resolve_dataset_cache_dir(config, phase)
+            print(
+                "Dataset cache enabled: mode=disk phase={} dir={} samples={}".format(
+                    phase,
+                    self._disk_cache_dir,
+                    len(self.all_data),
+                )
+            )
+        elif self.cache_mode == "memory":
+            print(
+                "Dataset cache enabled: mode=memory phase={} samples={}".format(
+                    phase,
+                    len(self.all_data),
+                )
+            )
 
     def __len__(self) -> int:
         return len(self.all_data)
+
+    def cache_stats(self) -> dict:
+        total = self._cache_hits + self._cache_misses
+        return {
+            "cache_mode": self.cache_mode,
+            "cache_hits": self._cache_hits,
+            "cache_misses": self._cache_misses,
+            "cache_hit_rate": (self._cache_hits / total) if total else 0.0,
+        }
 
     def _load_parse_source(self, index: int):
         last_error = None
@@ -72,8 +108,7 @@ class CADDatasetHighModify(Dataset):
                 continue
         raise RuntimeError("No valid cad_vec samples could be loaded for phase {}.".format(self.phase)) from last_error
 
-    def __getitem__(self, index: int):
-        data_id, parse_source = self._load_parse_source(index)
+    def _build_sample(self, data_id: str, parse_source: np.ndarray) -> dict:
         pad_len = self.max_total_len - parse_source.shape[0]
         cad_vec = np.concatenate([parse_source, EOS_VEC[np.newaxis].repeat(pad_len, axis=0)], axis=0)
 
@@ -111,6 +146,44 @@ class CADDatasetHighModify(Dataset):
             "id": data_id,
         }
 
+    def _load_from_cache(self, data_id: str) -> dict | None:
+        if self.cache_mode == "off":
+            return None
+        if self.cache_mode == "memory":
+            cached = self._memory_cache.get(data_id)
+            if cached is not None:
+                self._cache_hits += 1
+                return cached
+            return None
+        cache_path = resolve_cached_sample_path(self.config, self.phase, data_id)
+        cached = load_cached_sample(cache_path)
+        if cached is not None:
+            self._cache_hits += 1
+            if self.cache_mode == "memory":
+                self._memory_cache[data_id] = cached
+            return cached
+        return None
+
+    def _store_in_cache(self, data_id: str, sample: dict) -> None:
+        if self.cache_mode == "off":
+            return
+        self._cache_misses += 1
+        if self.cache_mode == "memory":
+            self._memory_cache[data_id] = clone_sample(sample)
+            return
+        cache_path = resolve_cached_sample_path(self.config, self.phase, data_id)
+        save_cached_sample(cache_path, sample)
+
+    def __getitem__(self, index: int):
+        data_id, parse_source = self._load_parse_source(index)
+        cached = self._load_from_cache(data_id)
+        if cached is not None:
+            return cached
+
+        sample = self._build_sample(data_id, parse_source)
+        self._store_in_cache(data_id, sample)
+        return sample
+
 
 def high_modify_collate_fn(batch):
     return {
@@ -136,10 +209,14 @@ def high_modify_collate_fn(batch):
 def get_high_modify_dataloader(phase: str, config, shuffle=None):
     is_shuffle = phase == "train" if shuffle is None else shuffle
     dataset = CADDatasetHighModify(phase, config)
-    return DataLoader(
-        dataset,
-        batch_size=config.batch_size,
-        shuffle=is_shuffle,
-        num_workers=config.num_workers,
-        collate_fn=high_modify_collate_fn,
-    )
+    num_workers = int(getattr(config, "num_workers", 0))
+    cache_mode = getattr(config, "dataset_cache", "off")
+    loader_kwargs = {
+        "batch_size": config.batch_size,
+        "shuffle": is_shuffle,
+        "num_workers": num_workers,
+        "collate_fn": high_modify_collate_fn,
+    }
+    if num_workers > 0:
+        loader_kwargs["persistent_workers"] = cache_mode == "memory"
+    return DataLoader(dataset, **loader_kwargs)

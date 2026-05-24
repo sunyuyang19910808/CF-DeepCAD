@@ -209,6 +209,8 @@ def main() -> None:
         best_ckpt_path = latest_path
         if epoch % cfg.save_frequency == 0:
             save_ckpt(use_case, optimizer, scheduler, clock, cfg, "ckpt_epoch{}".format(epoch))
+        if getattr(getattr(train_loader, "dataset", None), "cache_mode", "off") != "off":
+            print("Dataset cache stats epoch {}: {}".format(epoch, train_loader.dataset.cache_stats()))
         clock.tock()
         if stop_requested:
             break

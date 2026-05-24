@@ -97,6 +97,20 @@ class ConfigConstraintFusedHighModify:
 
         parser.add_argument("--batch_size", type=int, default=256)
         parser.add_argument("--num_workers", type=int, default=4)
+        parser.add_argument(
+            "--dataset_cache",
+            type=str,
+            default="off",
+            choices=["off", "memory", "disk"],
+            help="Cache preprocessed constraint GT. "
+            "'disk' writes under data_root/.cache/high_modify/ and is recommended for long training.",
+        )
+        parser.add_argument(
+            "--dataset_cache_dir",
+            type=str,
+            default="",
+            help="Optional override root for dataset cache; default is data_root/.cache/high_modify.",
+        )
         parser.add_argument("--nr_epochs", type=int, default=100)
         parser.add_argument("--lr", type=float, default=1e-3)
         parser.add_argument("--grad_clip", type=float, default=1.0)
