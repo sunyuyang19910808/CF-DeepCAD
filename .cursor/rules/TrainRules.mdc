@@ -40,7 +40,9 @@ alwaysApply: false
 
 **短程冒烟（任意方案通用）**：小 epoch / `max_steps`（若支持）、独立 `exp_name`，用于验证「数据 → 前向 → 反向 → 存 ckpt」闭环，不代替正式训练结论。
 
-## 4. 评估流程（固定步骤）
+## 4. 评估流程
+
+### 4.1 固定步骤
 
 约束融合类工作流在工程上通常拆成**可独立复跑**的两段（名称因包而异，顺序一致即可）：
 
@@ -50,6 +52,118 @@ alwaysApply: false
 4. **仅重算指标**：若中间文件已齐全，使用方案提供的「跳过重建、只读目录聚合」开关（如 `skip_reconstruct` 类），避免重复推理。
 
 **子集调试**：若支持 `sample_count` 或等价参数，用于快速打通评估脚本，不用于报告最终指标。
+
+### 4.2 指标计算口径
+
+评估分**两层**：**离散序列准确率**（DeepCAD 论文主指标）与**约束/几何恢复率**（轴对齐、平行/垂直 recall 等）。二者共用同一批 `*_vec.h5`，但由不同脚本聚合；实验记录 §4 中的列名与 `summary.json` / `*_acc_stat.txt` 字段对应关系见下表。
+
+#### 公共前提
+
+| 项 | 约定 |
+| --- | --- |
+| 中间文件 | `{reconstruction_dir}/{sample_id}_vec.h5`，含 `out_vec`（预测）、`gt_vec`（真值），均为整型离散 CAD 向量 `[T, 1+N_ARGS]` |
+| 序列长度 | 重建时通常按 **GT 首个 `EOS` 位置**截断后再写入 h5（与 `test.py -m rec` 一致） |
+| 解码口径 | 对 command / args logits 做 **argmax**（必要时对无效参数位填 `PAD_VAL`），即评估 **\(P(S\|z)\)** 硬解码结果，**不**在评测阶段注入外部约束 memory |
+| 几何解析 | `CADSequence.from_vector(vec, is_numerical=True, n=grid_size)`；默认 **`grid_size=256`** |
+| 角度阈值 | 约束类指标默认 **`angle_thresh=0.1`（度）**；无向夹角 `undirected_angle_deg(u,v) = min(θ, 180°−θ)` |
+| 数据子集 | 与训练/config 快照中的 **`eval_split`** 一致（通常为 `test`） |
+
+#### 离散序列指标：`ACC_cmd` / `ACC_param`
+
+**脚本**：`evaluation/evaluate_ae_acc.py --src {reconstruction_dir}` → 写出 `{reconstruction_dir}_acc_stat.txt`。
+
+**逐样本**
+
+1. 令 `out_cmd = out_vec[:,0]`，`gt_cmd = gt_vec[:,0]`；参数列为 `[:,1:]`。
+2. **`ACC_cmd`（样本级）** = 所有 token 位置上 `out_cmd == gt_cmd` 的比例（对序列长度求均值）。
+3. **`ACC_param`（样本级）** 仅统计同时满足以下条件的 token：
+   - `out_cmd == gt_cmd`（**命令必须先预测正确**才计入参数）；
+   - `gt_cmd` 不为 `SOL` / `EOS`；
+   - 参数位由 `CMD_ARGS_MASK[cmd]` 标记为有效。
+4. 有效参数比较规则（`TOLERANCE = 3`）：
+   - 一般参数：`|out − gt| < 3` 视为正确；
+   - **`Ext` 命令**：最后 2 个有效参数须 **严格相等**；
+   - **`Arc` 命令**：索引 3 的参数须 **严格相等**。
+5. 样本级 `ACC_param` = 上述所有有效参数比较结果的均值。
+
+**全集汇总**
+
+- **`ACC_cmd`** = 全部测试样本的样本级 `ACC_cmd` 再求平均。
+- **`ACC_param`** = 全部测试样本的样本级 `ACC_param` 再求平均。
+- 脚本另输出各 command 类型、各参数槽的分项准确率（用于 Arc/Ext 等短板定位）。
+
+#### 约束 / 几何指标：`ratio_h`、`ratio_v`、`parallel`、`perpendicular`
+
+**脚本**（因方案而异，口径应对齐）：
+
+- 约束融合 High Modify 等：`<pkg>.application.evaluate_constraints`（或 `<pkg>.evaluate`）→ `summary.json` + `per_sample_counts.csv`。
+- 原始 DeepCAD 复现：`论文尝试/DeepCAD原始约束指标/eval_original_deepcad_axis_constraints.py`（`-m rec` 重建 + 聚合，或 `--skip_reconstruct` 只读目录）。
+
+**解析失败计数**
+
+- **`parse_fail`**（实验记录列名）= `summary.json` 的 **`n_parse_fail_pred`**：预测向量 `out_vec` 无法解析为 `CADSequence` 的样本数（GT 解析失败记入 `n_parse_fail_gt`，一般不单列）。
+
+**Extrude 数量不一致**
+
+- **`ext_mismatch`**（实验记录列名）= **`n_samples_extrude_count_mismatch`**：GT 与 pred 解析后 **Extrude 段数不同**的样本数。
+
+**平行 / 垂直 recall（index-aligned，实验记录列 `parallel` / `perpendicular`）**
+
+对每个样本、每个 extrude 索引 `k`（取 `min(n_gt_ext, n_pred_ext)`）：
+
+1. 分别收集 GT / pred 该 extrude 内所有 `Line`，按 profile 顺序排列。
+2. 若 **GT 与 pred 的 line 数量不等**，该 extrude **跳过**（不计入 pair 分母）。
+3. 在 GT line 集合上用 `extract_raw_from_lines` 得到平行对 `(i,j)`、垂直对 `(i,j)`（**分母仅含 GT 定义的 pair**）。
+4. 在 **pred 的同名索引** `(i,j)` 上检查：
+   - **平行 hit**：`undirected_angle_deg(pred_dir_i, pred_dir_j) < angle_thresh`；
+   - **垂直 hit**：`|undirected_angle_deg(...) − 90°| < angle_thresh`。
+5. 全集 **`parallel`**（=`parallel_recall_index_aligned`）= `Σ par_hits / Σ par_denom`；
+   **`perpendicular`**（=`perpendicular_recall_index_aligned`）= `Σ perp_hits / Σ perp_denom`。
+6. 若全集分母为 0，对应指标为 `null`（JSON 中可能带 `*_defined: false`）。
+
+**水平 / 竖直恢复率 `ratio_h` / `ratio_v`（注意两套口径）**
+
+| 口径 | 适用脚本 | 定义 |
+| --- | --- | --- |
+| **Index-aligned 恢复（推荐，High Modify `evaluate_constraints`）** | `constraint_fused_*_high_modify` 等 | 对每个 extrude，在 **GT 与 pred line 数相等** 时：分母 = GT 判为 horizontal（或 vertical）的 **line 索引数**；分子 = 这些索引上 pred 方向仍与 +x（或 +y）夹角 `< angle_thresh` 的条数。全集 `ratio_h = Σ hits / Σ denom`（`ratio_v` 同理）。`summary.json` 中含 `ratio_h_definition` 文字说明。 |
+| **全局计数比（早期 DeepCAD 约束脚本）** | `eval_original_deepcad_axis_constraints.py` | 逐样本 `pred_h / gt_h`（GT 上 horizontal Line **条数**之比），全集 `ratio_h = Σ pred_h / Σ gt_h`（`ratio_v` 同理）。**与 index-aligned 数值不可直接对比**。 |
+
+对比实验时必须在记录中注明**使用的评估脚本与 `ratio_*` 口径**；本仓库主路径消融实验记录默认采用 **index-aligned**（High Modify 评估链）。
+
+#### 实验记录 ↔ 产物字段对照
+
+| 实验记录 §4 列 | 主要来源 | JSON / 文件键 |
+| --- | --- | --- |
+| `ACC_cmd` | `evaluate_ae_acc.py` | `avg command acc (ACC_cmd)` |
+| `ACC_param` | 同上 | `avg param acc (ACC_param)` |
+| `ratio_h` | 约束聚合 | `summary.json` → `ratio_h` |
+| `ratio_v` | 同上 | `ratio_v` |
+| `parallel` | 同上 | `parallel_recall_index_aligned` |
+| `perpendicular` | 同上 | `perpendicular_recall_index_aligned` |
+| `parse_fail` | 同上 | `n_parse_fail_pred` |
+| `ext_mismatch` | 同上 | `n_samples_extrude_count_mismatch` |
+
+#### 典型命令链（示例）
+
+```bash
+# 原始 DeepCAD 路径（D0 等）
+python test.py --proj_dir proj_log --exp_name newDeepCAD_2 -m rec --ckpt 80 --eval_split test \
+  -o proj_log/newDeepCAD_2/results/test_80
+python evaluation/evaluate_ae_acc.py --src proj_log/newDeepCAD_2/results/test_80
+python 论文尝试/DeepCAD原始约束指标/eval_original_deepcad_axis_constraints.py \
+  --proj_dir proj_log --exp_name newDeepCAD_2 --ckpt 80 --skip_reconstruct \
+  --reconstruction_dir proj_log/newDeepCAD_2/results/test_80 \
+  --out_dir proj_log/newDeepCAD_2/artifacts/test_eval_epoch80
+
+# 约束融合 High Modify 路径（H1 / A* 等）
+python -m constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify.evaluate \
+  --proj_dir proj_log/constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify \
+  --exp_name cf_high_modify_cad_only_100 --ckpt 20 --eval_split test \
+  --skip_reconstruct --reconstruction_dir .../results/test_20
+# 同上包默认一步完成重建+聚合时，省略 --skip_reconstruct
+```
+
+**禁止混用**：不同 `eval_split`、`grid_size`、`angle_thresh`、或不同 `ratio_h` 口径的 `summary.json` 不得与论文主表直接对比；跨方案对比时须复跑**同一评估脚本**。
 
 ## 5. 跨方案复现时必须对齐的信息
 
@@ -72,7 +186,7 @@ alwaysApply: false
 - [ ] `exp_dir` 内可找到与报告对应的 **checkpoint 路径** 与 **config 快照**。
 - [ ] 同一次评估的 **`summary.json` + `per_sample_counts.csv`** 与重建目录一并归档（或可从命令复现）。
 - [ ] 记录：`eval_split`、评估脚本版本（commit）、关键结构开关状态。
-- [ ] 与基线对比时使用**同一评估脚本、同一阈值定义**，避免混用不同口径。
+- [ ] 与基线对比时使用**同一评估脚本、同一阈值定义**（见 §4.2），避免混用不同口径。
 
 ## 8. 与 CF-DeepCAD 架构约束的关系
 
