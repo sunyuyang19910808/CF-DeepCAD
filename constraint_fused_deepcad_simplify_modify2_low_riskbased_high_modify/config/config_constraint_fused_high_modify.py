@@ -101,7 +101,7 @@ class ConfigConstraintFusedHighModify:
         parser.add_argument("--lr", type=float, default=1e-3)
         parser.add_argument("--grad_clip", type=float, default=1.0)
         parser.add_argument("--warmup_step", type=int, default=2000)
-        parser.add_argument("--save_frequency", type=int, default=5)
+        parser.add_argument("--save_frequency", type=int, default=10)
         parser.add_argument("--val_frequency", type=int, default=100)
         parser.add_argument("--log_frequency", type=int, default=10)
         parser.add_argument("--continue", dest="cont", action="store_true")

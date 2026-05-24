@@ -19,6 +19,10 @@ class DifferentiableSketchInterpreter(nn.Module):
       previous curve token's ``args[prev_pos, 0:2]`` within the same sketch (segment between
       consecutive ``SOL`` tokens). The first line in a sketch and any line crossing a ``SOL``
       boundary uses ``(0, 0)`` as the start (sketch origin).
+
+    Both branches are fully vectorised: no Python-side per-batch / per-token loops, no
+    ``.item()`` / ``.tolist()`` calls inside ``forward``. The corrected branch uses a
+    segment-aware ``cummax`` trick to look up the previous curve position in O(B*L) GPU work.
     """
 
     def __init__(
@@ -33,6 +37,19 @@ class DifferentiableSketchInterpreter(nn.Module):
         self.coord_range = coord_range
         self.eps = eps
         self.use_corrected_line_start = bool(use_corrected_line_start)
+        # Curve command ids are fixed by ``cadlib.macro``. We hold them as a lazy cache (not a
+        # registered buffer) so the module's ``state_dict`` stays byte-compatible with
+        # checkpoints produced before this optimisation (A1/A2/A2b/A2c).
+        self._curve_cmd_ids_cache: torch.Tensor | None = None
+
+    def _curve_ids_on(self, device: torch.device) -> torch.Tensor:
+        cache = self._curve_cmd_ids_cache
+        if cache is None or cache.device != device:
+            cache = torch.tensor(
+                [LINE_IDX, ARC_IDX, CIRCLE_IDX], dtype=torch.long, device=device
+            )
+            self._curve_cmd_ids_cache = cache
+        return cache
 
     def soft_dequantize(self, arg_logits: torch.Tensor) -> torch.Tensor:
         probs = torch.softmax(arg_logits, dim=-1)
@@ -40,6 +57,51 @@ class DifferentiableSketchInterpreter(nn.Module):
         soft_idx = (probs * bins).sum(dim=-1)
         lo, hi = self.coord_range
         return lo + (hi - lo) * soft_idx / max(self.n_bins - 1, 1)
+
+    def _corrected_start_per_token(
+        self,
+        end_per_token: torch.Tensor,
+        commands: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute ``start`` per token using a vectorised segment-aware cummax.
+
+        For each ``(b, pos)`` we want the index of the most recent curve token strictly before
+        ``pos`` within the current ``SOL`` segment. If no such curve exists (first curve in a
+        sketch, or only ``SOL`` tokens precede ``pos``), the start defaults to ``(0, 0)``.
+
+        Returns ``(start_per_token, valid_prev)`` of shapes ``(B, L, 2)`` and ``(B, L)``.
+        ``valid_prev`` is purely informational; ``start_per_token`` is already zero where no
+        previous curve was found.
+        """
+        B, L, _ = end_per_token.shape
+        device = end_per_token.device
+        long_dtype = torch.long
+
+        curve_ids = self._curve_ids_on(device)
+        curve_mask = (commands.unsqueeze(-1) == curve_ids).any(dim=-1)
+        sol_mask = commands == SOL_IDX
+
+        seq_idx = torch.arange(L, device=device, dtype=long_dtype).expand(B, L)
+        neg_ones = torch.full_like(seq_idx, -1)
+        cand_idx = torch.where(curve_mask, seq_idx, neg_ones)
+        sol_idx_only = torch.where(sol_mask, seq_idx, neg_ones)
+
+        # Shift right by 1 so cumulative max up to ``pos`` reflects only ``j < pos``.
+        pad = torch.full((B, 1), -1, dtype=long_dtype, device=device)
+        cand_shifted = torch.cat([pad, cand_idx[:, :-1]], dim=1)
+        sol_shifted = torch.cat([pad, sol_idx_only[:, :-1]], dim=1)
+
+        prev_curve_pos = cand_shifted.cummax(dim=1).values  # (B, L), -1 if none
+        prev_sol_pos = sol_shifted.cummax(dim=1).values  # (B, L), -1 if none
+
+        valid_prev = prev_curve_pos > prev_sol_pos  # curve after the latest SOL ⇒ same segment
+        prev_safe = prev_curve_pos.clamp_min(0)
+
+        # Gather end coords of the previous curve token; zero out invalid positions so the
+        # default ``(0, 0)`` origin is preserved for first-in-segment lines.
+        gathered = end_per_token.gather(1, prev_safe.unsqueeze(-1).expand(B, L, 2))
+        start_per_token = gathered * valid_prev.unsqueeze(-1).to(end_per_token.dtype)
+        return start_per_token, valid_prev
 
     def forward(
         self,
@@ -50,14 +112,9 @@ class DifferentiableSketchInterpreter(nn.Module):
         commands: torch.Tensor | None = None,
     ) -> dict:
         arg_cont = self.soft_dequantize(arg_logits)
-        batch_size = line_cmd_mask.shape[0]
+        B, L = line_cmd_mask.shape
         device = arg_logits.device
         dtype = arg_cont.dtype
-
-        start = torch.zeros(batch_size, max_lines, 2, device=device, dtype=dtype)
-        end = torch.zeros(batch_size, max_lines, 2, device=device, dtype=dtype)
-        unit = torch.zeros(batch_size, max_lines, 2, device=device, dtype=dtype)
-        valid = torch.zeros(batch_size, max_lines, device=device, dtype=dtype)
 
         if self.use_corrected_line_start:
             if commands is None:
@@ -65,52 +122,37 @@ class DifferentiableSketchInterpreter(nn.Module):
                     "use_corrected_line_start=True requires the `commands` tensor to "
                     "be passed to DifferentiableSketchInterpreter.forward."
                 )
-            curve_ids = {LINE_IDX, ARC_IDX, CIRCLE_IDX}
-            for batch_idx in range(batch_size):
-                line_positions = torch.nonzero(line_cmd_mask[batch_idx], as_tuple=False).flatten()
-                cmds_b = commands[batch_idx].tolist()
-                for pos in line_positions.tolist():
-                    line_idx = int(line_index_map[batch_idx, pos].item())
-                    if line_idx < 0 or line_idx >= max_lines:
-                        continue
-                    end_pt = arg_cont[batch_idx, pos, 0:2]
-                    prev_pos = -1
-                    for scan in range(pos - 1, -1, -1):
-                        cmd_id = int(cmds_b[scan])
-                        if cmd_id == SOL_IDX:
-                            break
-                        if cmd_id in curve_ids:
-                            prev_pos = scan
-                            break
-                    if prev_pos >= 0:
-                        start_pt = arg_cont[batch_idx, prev_pos, 0:2]
-                    else:
-                        start_pt = torch.zeros(2, device=device, dtype=dtype)
-                    direction = end_pt - start_pt
-                    norm = torch.norm(direction, dim=-1, keepdim=True).clamp_min(self.eps)
-                    unit_pt = direction / norm
-                    start[batch_idx, line_idx] = start_pt
-                    end[batch_idx, line_idx] = end_pt
-                    unit[batch_idx, line_idx] = unit_pt
-                    valid[batch_idx, line_idx] = 1.0
+            end_per_token = arg_cont[..., 0:2]
+            start_per_token, _ = self._corrected_start_per_token(end_per_token, commands)
         else:
-            line_arg = arg_cont[..., :4]
-            p1_all = line_arg[..., 0:2]
-            p2_all = line_arg[..., 2:4]
-            d_all = p2_all - p1_all
-            norm_all = torch.norm(d_all, dim=-1, keepdim=True).clamp_min(self.eps)
-            unit_all = d_all / norm_all
+            start_per_token = arg_cont[..., 0:2]
+            end_per_token = arg_cont[..., 2:4]
 
-            for batch_idx in range(batch_size):
-                line_positions = torch.nonzero(line_cmd_mask[batch_idx], as_tuple=False).flatten()
-                for pos in line_positions.tolist():
-                    line_idx = int(line_index_map[batch_idx, pos].item())
-                    if line_idx < 0 or line_idx >= max_lines:
-                        continue
-                    start[batch_idx, line_idx] = p1_all[batch_idx, pos]
-                    end[batch_idx, line_idx] = p2_all[batch_idx, pos]
-                    unit[batch_idx, line_idx] = unit_all[batch_idx, pos]
-                    valid[batch_idx, line_idx] = 1.0
+        direction = end_per_token - start_per_token
+        norm = torch.norm(direction, dim=-1, keepdim=True).clamp_min(self.eps)
+        unit_per_token = direction / norm
+
+        # Vectorised scatter into per-line tensors. ``line_index_map`` is -1 (or out of range)
+        # for non-line tokens; combine that with ``line_cmd_mask`` to get the (b, pos)
+        # locations whose contents must land at row ``line_index_map[b, pos]``.
+        valid_scatter = (
+            line_cmd_mask.bool()
+            & (line_index_map >= 0)
+            & (line_index_map < max_lines)
+        )
+        b_idx, pos_idx = torch.where(valid_scatter)
+        l_idx = line_index_map[b_idx, pos_idx]
+
+        start = torch.zeros(B, max_lines, 2, device=device, dtype=dtype)
+        end = torch.zeros(B, max_lines, 2, device=device, dtype=dtype)
+        unit = torch.zeros(B, max_lines, 2, device=device, dtype=dtype)
+        valid = torch.zeros(B, max_lines, device=device, dtype=dtype)
+
+        if b_idx.numel() > 0:
+            start[b_idx, l_idx] = start_per_token[b_idx, pos_idx]
+            end[b_idx, l_idx] = end_per_token[b_idx, pos_idx]
+            unit[b_idx, l_idx] = unit_per_token[b_idx, pos_idx]
+            valid[b_idx, l_idx] = 1.0
 
         return {
             "start": start,

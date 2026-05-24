@@ -132,57 +132,69 @@ def main() -> None:
         use_case.train()
         pbar = tqdm(train_loader)
         aux_weights = resolve_aux_weights(cfg, epoch)
+        a2d_mode = getattr(cfg, "use_hard_geom_bce", False) or getattr(
+            cfg, "use_corrected_line_start", False
+        )
         for batch_idx, batch in enumerate(pbar):
             optimizer.zero_grad()
-            out = use_case.execute(batch, aux_weights=aux_weights)
+            should_log = (clock.step % cfg.log_frequency == 0)
+            out = use_case.execute(
+                batch, aux_weights=aux_weights, compute_metrics=should_log
+            )
             out["loss"].backward()
             if cfg.grad_clip is not None:
                 torch.nn.utils.clip_grad_norm_(params, cfg.grad_clip)
             optimizer.step()
             scheduler.step()
 
-            metrics = OrderedDict(
-                loss=float(out["loss"].item()),
-                loss_cmd=float(out["loss_cmd"].item()),
-                loss_cmd_only=float(out["loss_cmd_only"].item()),
-                loss_args=float(out["loss_args"].item()),
-                pred_loss=float(out["pred_loss"].item()),
-                recon_loss=float(out["recon_loss"].item()),
-                unary_recon_loss=float(out["unary_recon_loss"].item()),
-                pair_recon_loss=float(out["pair_recon_loss"].item()),
-                geom_loss=float(out["geom_loss"].item()),
-                geom_horizontal=float(out["geom_horizontal"].item()),
-                geom_vertical=float(out["geom_vertical"].item()),
-                geom_parallel=float(out["geom_parallel"].item()),
-                geom_perpendicular=float(out["geom_perpendicular"].item()),
-                aux_alpha=float(out["aux_alpha"]),
-                aux_beta=float(out["aux_beta"]),
-                aux_gamma=float(out["aux_gamma"]),
-            )
-            if getattr(cfg, "use_hard_geom_bce", False) or getattr(cfg, "use_corrected_line_start", False):
-                metrics.update(
-                    geom_h_loss=float(out["geom_h_loss"].item()),
-                    geom_v_loss=float(out["geom_v_loss"].item()),
-                    geom_para_loss=float(out["geom_para_loss"].item()),
-                    geom_perp_loss=float(out["geom_perp_loss"].item()),
-                    aux_gamma_h=float(out["aux_gamma_h"]),
-                    aux_gamma_v=float(out["aux_gamma_v"]),
-                    aux_gamma_para=float(out["aux_gamma_para"]),
-                    aux_gamma_perp=float(out["aux_gamma_perp"]),
+            if should_log:
+                metrics = OrderedDict(
+                    loss=float(out["loss"].item()),
+                    loss_cmd=float(out["loss_cmd"].item()),
+                    loss_cmd_only=float(out["loss_cmd_only"].item()),
+                    loss_args=float(out["loss_args"].item()),
+                    pred_loss=float(out["pred_loss"].item()),
+                    recon_loss=float(out["recon_loss"].item()),
+                    unary_recon_loss=float(out["unary_recon_loss"].item()),
+                    pair_recon_loss=float(out["pair_recon_loss"].item()),
+                    geom_loss=float(out["geom_loss"].item()),
+                    geom_horizontal=float(out["geom_horizontal"].item()),
+                    geom_vertical=float(out["geom_vertical"].item()),
+                    geom_parallel=float(out["geom_parallel"].item()),
+                    geom_perpendicular=float(out["geom_perpendicular"].item()),
+                    aux_alpha=float(out["aux_alpha"]),
+                    aux_beta=float(out["aux_beta"]),
+                    aux_gamma=float(out["aux_gamma"]),
                 )
-            pbar.set_description("EPOCH[{}][{}]".format(epoch, batch_idx))
-            pbar.set_postfix(metrics)
+                if a2d_mode:
+                    metrics.update(
+                        geom_h_loss=float(out["geom_h_loss"].item()),
+                        geom_v_loss=float(out["geom_v_loss"].item()),
+                        geom_para_loss=float(out["geom_para_loss"].item()),
+                        geom_perp_loss=float(out["geom_perp_loss"].item()),
+                        aux_gamma_h=float(out["aux_gamma_h"]),
+                        aux_gamma_v=float(out["aux_gamma_v"]),
+                        aux_gamma_para=float(out["aux_gamma_para"]),
+                        aux_gamma_perp=float(out["aux_gamma_perp"]),
+                    )
+                pbar.set_description("EPOCH[{}][{}]".format(epoch, batch_idx))
+                pbar.set_postfix(metrics)
 
-            if clock.step % cfg.log_frequency == 0:
                 for key, value in metrics.items():
                     train_tb.add_scalar(key, value, clock.step)
                 row = {"epoch": epoch, "step": clock.step, **metrics}
                 append_csv_row(metrics_csv, row)
+            else:
+                pbar.set_description("EPOCH[{}][{}]".format(epoch, batch_idx))
 
             if clock.step % cfg.val_frequency == 0:
                 use_case.eval()
                 with torch.no_grad():
-                    val_out = use_case.execute(next(val_loader), aux_weights=aux_weights)
+                    val_out = use_case.execute(
+                        next(val_loader),
+                        aux_weights=aux_weights,
+                        compute_metrics=False,
+                    )
                 for key in ("loss", "loss_cmd", "pred_loss", "recon_loss", "geom_loss", "aux_alpha", "aux_beta", "aux_gamma"):
                     value = val_out[key]
                     val_tb.add_scalar(key, float(value.item() if hasattr(value, "item") else value), clock.step)

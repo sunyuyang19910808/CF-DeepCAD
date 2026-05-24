@@ -144,7 +144,7 @@ class TrainConstraintFusedHighModifyBatchUseCase:
         self.interpreter.load_state_dict(state_dict["interpreter"])
         self.constraint_evaluator.load_state_dict(state_dict["constraint_evaluator"])
 
-    def execute(self, batch, aux_weights=None):
+    def execute(self, batch, aux_weights=None, compute_metrics: bool = True):
         commands = batch["command"].to(self.device)
         args = batch["args"].to(self.device)
         groups = batch["groups"].to(self.device)
@@ -202,7 +202,11 @@ class TrainConstraintFusedHighModifyBatchUseCase:
             commands=commands,
         )
         geom_components, geom_metrics = self.constraint_evaluator(
-            soft_lines, unary_gt, pair_gt, line_mask=line_mask
+            soft_lines,
+            unary_gt,
+            pair_gt,
+            line_mask=line_mask,
+            compute_metrics=compute_metrics,
         )
         if not getattr(self.cfg, "enable_soft_geometry", True):
             geom_components = {key: value * 0.0 for key, value in geom_components.items()}
@@ -239,7 +243,7 @@ class TrainConstraintFusedHighModifyBatchUseCase:
             + geom_components["geom_para"]
             + geom_components["geom_perp"]
         )
-        return {
+        out = {
             "loss": composed["loss"],
             "loss_cmd": loss_cmd,
             "loss_cmd_only": cad_losses["loss_cmd"],
@@ -254,10 +258,6 @@ class TrainConstraintFusedHighModifyBatchUseCase:
             "geom_v_loss": geom_components["geom_v"],
             "geom_para_loss": geom_components["geom_para"],
             "geom_perp_loss": geom_components["geom_perp"],
-            "geom_horizontal": geom_metrics["geom_horizontal"],
-            "geom_vertical": geom_metrics["geom_vertical"],
-            "geom_parallel": geom_metrics["geom_parallel"],
-            "geom_perpendicular": geom_metrics["geom_perpendicular"],
             "aux_alpha": alpha,
             "aux_beta": beta,
             "aux_gamma": gamma_h,
@@ -272,6 +272,14 @@ class TrainConstraintFusedHighModifyBatchUseCase:
             "encoder_outputs": encoder_outputs,
             "decoder_line_features": decoder_line_features,
         }
+        if compute_metrics and geom_metrics:
+            out.update(
+                geom_horizontal=geom_metrics["geom_horizontal"],
+                geom_vertical=geom_metrics["geom_vertical"],
+                geom_parallel=geom_metrics["geom_parallel"],
+                geom_perpendicular=geom_metrics["geom_perpendicular"],
+            )
+        return out
 
 
 def _build_bottleneck(cfg) -> nn.Module:
