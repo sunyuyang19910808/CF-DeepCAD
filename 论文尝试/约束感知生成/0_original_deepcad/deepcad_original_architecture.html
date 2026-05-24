@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepCAD — Original Model Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --text: #e4e6ed;
+    --text-dim: #7d819a;
+    --blue: #4e94e6;
+    --blue-light: #72b4ff;
+    --green: #48c774;
+    --orange: #eda94e;
+    --purple: #a07de8;
+    --arrow: #555b78;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Sans 3','Noto Sans SC', sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 30px 10px 60px;
+  }
+
+  .wrap { width: 900px; }
+
+  h1 {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-bottom: 4px;
+    background: linear-gradient(135deg,var(--blue-light),var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .sub { text-align:center; font-size:13px; color:var(--text-dim); margin-bottom:24px; font-weight:300; }
+
+  svg { display:block; margin:0 auto; }
+
+  .t  { font-family:'Source Sans 3','Noto Sans SC',sans-serif; fill:var(--text); }
+  .td { fill:var(--text-dim); }
+  .tm { font-family:'JetBrains Mono',monospace; }
+  .tb { fill:var(--blue-light); }
+  .tg { fill:var(--green); }
+  .to { fill:var(--orange); }
+  .tp { fill:var(--purple); }
+
+  .bk { rx:7; ry:7; stroke-width:2; }
+  .bo { fill:rgba(78,148,230,.07); stroke:var(--blue); }
+  .bg { fill:rgba(72,199,116,.08); stroke:var(--green); }
+  .bl { fill:rgba(237,169,78,.08); stroke:var(--orange); }
+  .bp { fill:rgba(160,125,232,.1); stroke:var(--purple); }
+
+  .sb  { rx:5; ry:5; stroke-width:1.5; }
+  .sbo { fill:rgba(78,148,230,.1); stroke:rgba(78,148,230,.5); }
+
+  .gb { rx:10; ry:10; stroke-width:1.4; stroke-dasharray:7 5; fill:none; }
+  .gbo{ stroke:rgba(78,148,230,.28); }
+
+  .ar  { stroke:var(--arrow); stroke-width:2; fill:none; }
+  .brk { stroke:var(--text-dim); stroke-width:1; fill:none; stroke-dasharray:4 3; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>DeepCAD</h1>
+  <p class="sub">Original Model Architecture — 原始模型结构图（竖版）</p>
+
+<svg width="780" height="1420" viewBox="0 0 780 1420">
+<defs>
+  <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--arrow)" stroke-width="1.4"/>
+  </marker>
+  <marker id="ahp" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--purple)" stroke-width="1.4"/>
+  </marker>
+</defs>
+
+<!-- ========== PHASE SIDEBAR ========== -->
+<line x1="72" y1="38" x2="72" y2="520" style="stroke:var(--purple);stroke-width:1;opacity:.3"/>
+<text x="52" y="290" class="t tm" style="font-size:11px;" transform="rotate(-90,52,290)" text-anchor="middle" fill="var(--purple)" opacity=".7">Encoding</text>
+
+<line x1="72" y1="555" x2="72" y2="1005" style="stroke:var(--blue);stroke-width:1;opacity:.3"/>
+<text x="52" y="780" class="t tm" style="font-size:11px;" transform="rotate(-90,52,780)" text-anchor="middle" fill="var(--blue)" opacity=".7">Decoding</text>
+
+<line x1="72" y1="1025" x2="72" y2="1390" style="stroke:var(--orange);stroke-width:1;opacity:.3"/>
+<text x="52" y="1210" class="t tm" style="font-size:11px;" transform="rotate(-90,52,1210)" text-anchor="middle" fill="var(--orange)" opacity=".7">Training</text>
+
+<!-- ========== INPUT ========== -->
+<text x="215" y="30" class="t tm td" style="font-size:11px;letter-spacing:2px;">INPUT</text>
+
+<rect x="215" y="42" width="340" height="56" class="bk bo"/>
+<text x="385" y="62" class="t" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">CAD 命令序列</text>
+<text x="385" y="82" class="t tm td" style="font-size:11px;" text-anchor="middle" dominant-baseline="central">commands (S×N)  +  args (S×N×N_ARGS)</text>
+
+<line x1="385" y1="98" x2="385" y2="130" class="ar" marker-end="url(#ah)"/>
+
+<!-- ========== ENCODER GROUP ========== -->
+<text x="215" y="146" class="t tm td" style="font-size:11px;letter-spacing:2px;">ENCODER</text>
+<rect x="215" y="156" width="340" height="288" class="gb gbo"/>
+
+<!-- CADEmbedding -->
+<rect x="245" y="172" width="280" height="62" class="bk bo"/>
+<text x="385" y="192" class="t" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">CAD Embedding</text>
+<text x="385" y="212" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Command Emb + Arg Emb + Positional Encoding</text>
+<text x="385" y="226" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">(+ optional Group Embedding)</text>
+<line x1="385" y1="234" x2="385" y2="262" class="ar" marker-end="url(#ah)"/>
+
+<!-- Transformer Encoder Layer -->
+<rect x="245" y="266" width="280" height="62" class="bk bo"/>
+<text x="385" y="286" class="t" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Transformer Encoder Layer</text>
+<text x="385" y="306" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">LayerNorm → Self-Attention → Residual</text>
+<text x="385" y="320" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">→ LayerNorm → FFN → Residual</text>
+
+<!-- repeat bracket -->
+<path d="M535,270 L545,270 L545,324 L535,324" class="brk"/>
+<text x="564" y="297" class="t tm td" style="font-size:12px;" text-anchor="middle" dominant-baseline="central">×N</text>
+
+<line x1="385" y1="328" x2="385" y2="358" class="ar" marker-end="url(#ah)"/>
+
+<!-- Mean Pooling -->
+<rect x="285" y="362" width="200" height="42" class="bk bo"/>
+<text x="385" y="377" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Mean Pooling</text>
+<text x="385" y="394" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Σ(memory × mask) / Σmask → z</text>
+
+<line x1="385" y1="404" x2="385" y2="434" class="ar" marker-end="url(#ah)"/>
+
+<!-- ========== BOTTLENECK ========== -->
+<text x="215" y="450" class="t tm td" style="font-size:11px;letter-spacing:2px;">BOTTLENECK</text>
+<rect x="275" y="462" width="220" height="46" class="bk bo"/>
+<text x="385" y="479" class="t" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Bottleneck</text>
+<text x="385" y="497" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Linear(d_model → dim_z) → Tanh</text>
+
+<line x1="385" y1="508" x2="385" y2="534" class="ar" marker-end="url(#ah)"/>
+
+<!-- Latent z -->
+<rect x="325" y="537" width="120" height="32" class="bk bp"/>
+<text x="385" y="553" class="t tp" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">z ∈ ℝ^{dim_z}</text>
+
+<!-- ========== DECODER ========== -->
+<text x="155" y="598" class="t tm td" style="font-size:11px;letter-spacing:2px;">DECODER</text>
+<rect x="155" y="608" width="460" height="390" class="gb gbo" style="stroke:rgba(78,148,230,.2)"/>
+
+<!-- ConstEmbedding -->
+<rect x="245" y="626" width="280" height="54" class="bk bo"/>
+<text x="385" y="645" class="t" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Const Embedding</text>
+<text x="385" y="665" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Positional Encoding on learned zeros</text>
+
+<line x1="385" y1="680" x2="385" y2="710" class="ar" marker-end="url(#ah)"/>
+
+<!-- ===== Decoder Layer group (repeated) ===== -->
+<rect x="185" y="715" width="400" height="240" class="gb gbo" style="stroke-dasharray:5 4;stroke:rgba(78,148,230,.22)"/>
+<text x="595" y="842" class="t tm td" style="font-size:13px;" text-anchor="middle" dominant-baseline="central">×N</text>
+<text x="200" y="735" class="t tm tb" style="font-size:10px;" text-anchor="start" dominant-baseline="central">Decoder Layer (GlobalImproved)</text>
+
+<!-- Self-Attention -->
+<rect x="260" y="750" width="250" height="44" class="sb sbo"/>
+<text x="385" y="766" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Self-Attention</text>
+<text x="385" y="783" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">LayerNorm → MHA → Residual</text>
+
+<line x1="385" y1="794" x2="385" y2="820" class="ar" marker-end="url(#ah)"/>
+
+<!-- Global z Injection -->
+<rect x="260" y="824" width="250" height="44" class="sb sbo"/>
+<text x="385" y="840" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Global z Injection</text>
+<text x="385" y="857" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Linear(z) → Broadcast → Residual</text>
+
+<!-- z arrow to Global z -->
+<path d="M385,569 L145,569 L145,846 L260,846" style="stroke:var(--purple);stroke-width:1.8;fill:none;" marker-end="url(#ahp)"/>
+
+<line x1="385" y1="868" x2="385" y2="894" class="ar" marker-end="url(#ah)"/>
+
+<!-- FFN -->
+<rect x="260" y="898" width="250" height="44" class="sb sbo"/>
+<text x="385" y="914" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Feed-Forward Network</text>
+<text x="385" y="931" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">LayerNorm → Linear → ReLU → Linear → Residual</text>
+
+<!-- ========== OUTPUT HEAD ========== -->
+<line x1="385" y1="955" x2="385" y2="1030" class="ar" marker-end="url(#ah)"/>
+
+<text x="215" y="1040" class="t tm td" style="font-size:11px;letter-spacing:2px;">OUTPUT HEAD</text>
+
+<rect x="225" y="1055" width="320" height="66" class="bk bg"/>
+<text x="385" y="1076" class="t" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">FCN 输出头</text>
+<text x="385" y="1096" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Command Head: Linear(d_model → n_commands)</text>
+<text x="385" y="1110" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Args Head: Linear(d_model → n_args × args_dim)</text>
+
+<!-- arrows down to two outputs -->
+<line x1="310" y1="1121" x2="310" y2="1160" class="ar" marker-end="url(#ah)"/>
+<line x1="460" y1="1121" x2="460" y2="1160" class="ar" marker-end="url(#ah)"/>
+
+<!-- Command Logits -->
+<rect x="220" y="1165" width="180" height="34" class="bk bg" style="fill:rgba(72,199,116,.14);"/>
+<text x="310" y="1182" class="t tg" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Command Logits</text>
+
+<!-- Args Logits -->
+<rect x="420" y="1165" width="180" height="34" class="bk bg" style="fill:rgba(72,199,116,.14);"/>
+<text x="510" y="1182" class="t tg" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Args Logits</text>
+
+<!-- ========== LOSS ========== -->
+<line x1="310" y1="1199" x2="310" y2="1235" class="ar" marker-end="url(#ah)"/>
+<line x1="510" y1="1199" x2="510" y2="1235" class="ar" marker-end="url(#ah)"/>
+
+<text x="215" y="1240" class="t tm td" style="font-size:11px;letter-spacing:2px;">LOSS</text>
+
+<rect x="220" y="1250" width="180" height="42" class="bk bl"/>
+<text x="310" y="1265" class="t to" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">L_cmd</text>
+<text x="310" y="1282" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Command Cross-Entropy</text>
+
+<rect x="420" y="1250" width="180" height="42" class="bk bl"/>
+<text x="510" y="1265" class="t to" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">L_args</text>
+<text x="510" y="1282" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Args Cross-Entropy</text>
+
+<!-- arrows to total loss -->
+<line x1="310" y1="1292" x2="310" y2="1326" class="ar" marker-end="url(#ah)"/>
+<line x1="510" y1="1292" x2="510" y2="1326" class="ar" marker-end="url(#ah)"/>
+
+<!-- plus -->
+<text x="410" y="1316" class="t" style="font-size:18px;fill:var(--text-dim);" text-anchor="middle" dominant-baseline="central">+</text>
+
+<!-- Total Loss -->
+<rect x="225" y="1330" width="370" height="48" class="bk" style="fill:rgba(237,169,78,.1);stroke:var(--orange);stroke-width:2.5;"/>
+<text x="410" y="1348" class="t" style="font-size:15px;font-weight:700;" text-anchor="middle" dominant-baseline="central">L_total = w₁·L_cmd + w₂·L_args</text>
+<text x="410" y="1368" class="t tm to" style="font-size:11px;" text-anchor="middle" dominant-baseline="central">Weighted Cross-Entropy Loss</text>
+
+<!-- ========== SUMMARY BOX ========== -->
+<rect x="620" y="156" width="140" height="288" rx="8" ry="8" fill="rgba(255,255,255,.02)" stroke="rgba(255,255,255,.06)" stroke-width="1"/>
+<text x="690" y="178" class="t" style="font-size:11px;font-weight:700;fill:var(--text-dim);" text-anchor="middle" dominant-baseline="central">KEY PARAMS</text>
+
+<text x="640" y="208" class="t tm td" style="font-size:10px;" dominant-baseline="central">d_model</text>
+<text x="740" y="208" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">256</text>
+
+<text x="640" y="232" class="t tm td" style="font-size:10px;" dominant-baseline="central">dim_z</text>
+<text x="740" y="232" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">256</text>
+
+<text x="640" y="256" class="t tm td" style="font-size:10px;" dominant-baseline="central">n_heads</text>
+<text x="740" y="256" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">8</text>
+
+<text x="640" y="280" class="t tm td" style="font-size:10px;" dominant-baseline="central">n_layers</text>
+<text x="740" y="280" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">4</text>
+
+<text x="640" y="304" class="t tm td" style="font-size:10px;" dominant-baseline="central">dim_ff</text>
+<text x="740" y="304" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">512</text>
+
+<text x="640" y="328" class="t tm td" style="font-size:10px;" dominant-baseline="central">max_seq_len</text>
+<text x="740" y="328" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">60/272</text>
+
+<text x="640" y="352" class="t tm td" style="font-size:10px;" dominant-baseline="central">n_commands</text>
+<text x="740" y="352" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">6</text>
+
+<text x="640" y="376" class="t tm td" style="font-size:10px;" dominant-baseline="central">n_args</text>
+<text x="740" y="376" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">16</text>
+
+<text x="640" y="400" class="t tm td" style="font-size:10px;" dominant-baseline="central">dropout</text>
+<text x="740" y="400" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">0.1</text>
+
+<text x="640" y="424" class="t tm td" style="font-size:10px;" dominant-baseline="central">args_dim</text>
+<text x="740" y="424" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">256</text>
+
+<!-- ========== RIGHT SIDE: DATA FLOW ANNOTATION ========== -->
+<rect x="620" y="608" width="140" height="200" rx="8" ry="8" fill="rgba(255,255,255,.02)" stroke="rgba(255,255,255,.06)" stroke-width="1"/>
+<text x="690" y="630" class="t" style="font-size:11px;font-weight:700;fill:var(--text-dim);" text-anchor="middle" dominant-baseline="central">DATA SHAPES</text>
+
+<text x="636" y="660" class="t tm td" style="font-size:10px;" dominant-baseline="central">Input</text>
+<text x="744" y="660" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">(S, N)</text>
+
+<text x="636" y="684" class="t tm td" style="font-size:10px;" dominant-baseline="central">Embedded</text>
+<text x="744" y="684" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">(S, N, d)</text>
+
+<text x="636" y="708" class="t tm td" style="font-size:10px;" dominant-baseline="central">Memory</text>
+<text x="744" y="708" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">(S, N, d)</text>
+
+<text x="636" y="732" class="t tm td" style="font-size:10px;" dominant-baseline="central">z (pooled)</text>
+<text x="744" y="732" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">(1, N, d_z)</text>
+
+<text x="636" y="756" class="t tm td" style="font-size:10px;" dominant-baseline="central">Decoder in</text>
+<text x="744" y="756" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">(S, N, d)</text>
+
+<text x="636" y="780" class="t tm td" style="font-size:10px;" dominant-baseline="central">Cmd logits</text>
+<text x="744" y="780" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">(S, N, 6)</text>
+
+<text x="636" y="804" class="t tm td" style="font-size:10px;" dominant-baseline="central">Arg logits</text>
+<text x="744" y="804" class="t tm tb" style="font-size:10px;text-anchor:end;" dominant-baseline="central">(S,N,16,256)</text>
+
+</svg>
+</div>
+</body>
+</html>

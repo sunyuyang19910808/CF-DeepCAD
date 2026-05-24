@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constraint-Aware DeepCAD — Model Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --card-bg: #181b24;
+    --text: #e4e6ed;
+    --text-dim: #7d819a;
+    --blue: #4e94e6;
+    --blue-light: #72b4ff;
+    --red: #e8504f;
+    --red-light: #ff7a7a;
+    --red-glow: rgba(232,80,79,0.18);
+    --green: #48c774;
+    --orange: #eda94e;
+    --purple: #a07de8;
+    --arrow: #555b78;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Sans 3','Noto Sans SC', sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 30px 10px 60px;
+  }
+
+  .wrap { width: 1080px; }
+
+  h1 {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-bottom: 4px;
+    background: linear-gradient(135deg,var(--blue-light),var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .sub { text-align:center; font-size:13px; color:var(--text-dim); margin-bottom:12px; font-weight:300; }
+
+  .legend {
+    display:flex; justify-content:center; gap:30px;
+    margin-bottom: 24px; font-size:13px;
+  }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:14px; height:14px; border-radius:3px; border:2px solid; }
+  .dot.orig { border-color:var(--blue); background:rgba(78,148,230,.12); }
+  .dot.new  { border-color:var(--red);  background:var(--red-glow); }
+
+  svg { display:block; margin:0 auto; }
+
+  /* text classes */
+  .t  { font-family:'Source Sans 3','Noto Sans SC',sans-serif; fill:var(--text); }
+  .td { fill:var(--text-dim); }
+  .tm { font-family:'JetBrains Mono',monospace; }
+  .tr { fill:var(--red-light); }
+  .tb { fill:var(--blue-light); }
+  .tg { fill:var(--green); }
+  .to { fill:var(--orange); }
+  .tp { fill:var(--purple); }
+
+  /* blocks */
+  .bk { rx:7; ry:7; stroke-width:2; }
+  .bo { fill:rgba(78,148,230,.07); stroke:var(--blue); }
+  .bn { fill:var(--red-glow); stroke:var(--red); filter:url(#glow); }
+  .bg { fill:rgba(72,199,116,.08); stroke:var(--green); }
+  .bgn{ fill:var(--red-glow); stroke:var(--red); filter:url(#glow); }
+  .bl { fill:rgba(237,169,78,.08); stroke:var(--orange); }
+  .bln{ fill:var(--red-glow); stroke:var(--red); filter:url(#glow); }
+  .bp { fill:rgba(160,125,232,.1); stroke:var(--purple); }
+
+  /* sub blocks inside decoder layer */
+  .sb  { rx:5; ry:5; stroke-width:1.5; }
+  .sbo { fill:rgba(78,148,230,.1); stroke:rgba(78,148,230,.5); }
+  .sbn { fill:rgba(232,80,79,.08); stroke:rgba(232,80,79,.55); filter:url(#glow); }
+
+  /* group dashed box */
+  .gb { rx:10; ry:10; stroke-width:1.4; stroke-dasharray:7 5; fill:none; }
+  .gbo{ stroke:rgba(78,148,230,.28); }
+  .gbn{ stroke:rgba(232,80,79,.35); }
+
+  /* arrows */
+  .ar  { stroke:var(--arrow); stroke-width:2; fill:none; }
+  .arn { stroke:var(--red); stroke-width:2; fill:none; }
+  .ard { stroke-dasharray:6 4; }
+
+  /* badge */
+  .badge-bg { fill:var(--red); rx:3; ry:3; }
+  .badge-tx { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; fill:#fff; text-anchor:middle; dominant-baseline:central; }
+
+  /* bracket */
+  .brk { stroke:var(--text-dim); stroke-width:1; fill:none; stroke-dasharray:4 3; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Constraint-Aware DeepCAD</h1>
+  <p class="sub">Model Architecture Diagram &mdash; 竖版结构图</p>
+  <div class="legend">
+    <span><div class="dot orig"></div> Original DeepCAD 原有模块</span>
+    <span><div class="dot new"></div> <b style="color:var(--red-light)">NEW — 本文新增模块</b></span>
+  </div>
+
+<svg width="1060" height="1660" viewBox="0 0 1060 1660">
+<defs>
+  <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--arrow)" stroke-width="1.4"/>
+  </marker>
+  <marker id="ahr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--red)" stroke-width="1.4"/>
+  </marker>
+  <marker id="ahp" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--purple)" stroke-width="1.4"/>
+  </marker>
+  <filter id="glow" x="-18%" y="-18%" width="136%" height="136%">
+    <feGaussianBlur stdDeviation="5" result="b"/>
+    <feFlood flood-color="rgba(232,80,79,.22)" result="c"/>
+    <feComposite in="c" in2="b" operator="in" result="g"/>
+    <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+</defs>
+
+<!-- ========== PHASE SIDEBAR ========== -->
+<line x1="82" y1="38" x2="82" y2="520" style="stroke:var(--purple);stroke-width:1;opacity:.3"/>
+<text x="62" y="290" class="t tm" style="font-size:11px;" transform="rotate(-90,62,290)" text-anchor="middle" fill="var(--purple)" opacity=".7">Encoding</text>
+
+<line x1="82" y1="558" x2="82" y2="1040" style="stroke:var(--blue);stroke-width:1;opacity:.3"/>
+<text x="62" y="800" class="t tm" style="font-size:11px;" transform="rotate(-90,62,800)" text-anchor="middle" fill="var(--blue)" opacity=".7">Decoding</text>
+
+<line x1="82" y1="1060" x2="82" y2="1510" style="stroke:var(--orange);stroke-width:1;opacity:.3"/>
+<text x="62" y="1290" class="t tm" style="font-size:11px;" transform="rotate(-90,62,1290)" text-anchor="middle" fill="var(--orange)" opacity=".7">Training</text>
+
+<!-- ========== INPUT ========== -->
+<text x="225" y="30" class="t tm td" style="font-size:11px;letter-spacing:2px;">INPUT</text>
+<rect x="225" y="42" width="310" height="48" class="bk bo"/>
+<text x="380" y="60" class="t" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">CAD 命令序列</text>
+<text x="380" y="78" class="t tm td" style="font-size:11px;" text-anchor="middle" dominant-baseline="central">commands + args  (S × N)</text>
+
+<!-- arrow ↓ -->
+<line x1="380" y1="90" x2="380" y2="122" class="ar" marker-end="url(#ah)"/>
+
+<!-- ========== ENCODER GROUP ========== -->
+<text x="225" y="138" class="t tm td" style="font-size:11px;letter-spacing:2px;">ENCODER</text>
+<rect x="225" y="148" width="310" height="250" class="gb gbo"/>
+
+<!-- CADEmbedding -->
+<rect x="255" y="162" width="250" height="46" class="bk bo"/>
+<text x="380" y="179" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">CAD Embedding</text>
+<text x="380" y="196" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Command Emb + Arg Emb + PosEnc</text>
+<line x1="380" y1="208" x2="380" y2="234" class="ar" marker-end="url(#ah)"/>
+
+<!-- Transformer Encoder Layer -->
+<rect x="255" y="238" width="250" height="46" class="bk bo"/>
+<text x="380" y="255" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Transformer Encoder Layer</text>
+<text x="380" y="272" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Self-Attn → FFN</text>
+<path d="M515,242 L523,242 L523,280 L515,280" class="brk"/>
+<text x="542" y="261" class="t tm td" style="font-size:11px;" text-anchor="middle" dominant-baseline="central">×N</text>
+<line x1="380" y1="284" x2="380" y2="310" class="ar" marker-end="url(#ah)"/>
+
+<!-- Mean Pooling -->
+<rect x="295" y="314" width="170" height="36" class="bk bo"/>
+<text x="380" y="332" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Mean Pooling → z</text>
+<line x1="380" y1="350" x2="380" y2="380" class="ar" marker-end="url(#ah)"/>
+
+<!-- ========== BOTTLENECK ========== -->
+<text x="225" y="396" class="t tm td" style="font-size:11px;letter-spacing:2px;">BOTTLENECK</text>
+<rect x="285" y="408" width="190" height="40" class="bk bo"/>
+<text x="380" y="422" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Bottleneck</text>
+<text x="380" y="438" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Linear → Tanh</text>
+<line x1="380" y1="448" x2="380" y2="476" class="ar" marker-end="url(#ah)"/>
+
+<!-- Latent z -->
+<rect x="325" y="480" width="110" height="30" class="bk bp"/>
+<text x="380" y="495" class="t tp" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">z ∈ ℝ^d_z</text>
+
+<!-- ========== CONSTRAINT BRANCH (NEW) ========== -->
+<!-- dashed arrow from input right to constraint extractor -->
+<path d="M535,66 L660,66 L660,160" class="arn ard" marker-end="url(#ahr)"/>
+
+<text x="615" y="138" class="t tm" style="font-size:11px;letter-spacing:2px;fill:var(--red);">CONSTRAINT BRANCH</text>
+
+<!-- Constraint Extractor -->
+<rect x="600" y="165" width="280" height="55" class="bk bn"/>
+<rect x="845" y="165" width="38" height="15" class="badge-bg"/>
+<text x="864" y="173" class="badge-tx">NEW</text>
+<text x="740" y="186" class="t tr" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">约束自动提取器</text>
+<text x="740" y="206" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Constraint Extractor (offline)</text>
+<line x1="740" y1="220" x2="740" y2="250" class="arn" marker-end="url(#ahr)"/>
+
+<!-- Constraint Dict -->
+<rect x="630" y="254" width="220" height="52" class="bk bn"/>
+<text x="740" y="273" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">约束字典</text>
+<text x="740" y="293" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Horizontal / Vertical / Parallel / Perp / Collinear</text>
+<line x1="740" y1="306" x2="740" y2="336" class="arn" marker-end="url(#ahr)"/>
+
+<!-- Constraint Embedding -->
+<rect x="610" y="340" width="260" height="68" class="bk bn"/>
+<rect x="835" y="340" width="38" height="15" class="badge-bg"/>
+<text x="854" y="348" class="badge-tx">NEW</text>
+<text x="740" y="362" class="t tr" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">约束编码模块</text>
+<text x="740" y="382" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Constraint Embedding</text>
+<text x="740" y="396" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Type Emb + Entity Emb → LayerNorm</text>
+<line x1="740" y1="408" x2="740" y2="478" class="arn" marker-end="url(#ahr)"/>
+
+<!-- C token -->
+<rect x="675" y="482" width="130" height="30" class="bk bn" style="filter:none;"/>
+<text x="740" y="497" class="t" style="font-size:12px;font-weight:600;fill:var(--red-light);" text-anchor="middle" dominant-baseline="central">C ∈ ℝ^{T_c×d}</text>
+
+<!-- ========== DECODER ========== -->
+<text x="165" y="555" class="t tm td" style="font-size:11px;letter-spacing:2px;">DECODER</text>
+<rect x="160" y="565" width="700" height="440" class="gb gbo" style="stroke:rgba(78,148,230,.2)"/>
+
+<!-- ConstEmbedding -->
+<rect x="255" y="582" width="250" height="46" class="bk bo"/>
+<text x="380" y="599" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Const Embedding</text>
+<text x="380" y="616" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Positional Encoding (learned zeros)</text>
+<line x1="380" y1="628" x2="380" y2="658" class="ar" marker-end="url(#ah)"/>
+
+<!-- ===== Decoder Layer group (repeated) ===== -->
+<rect x="190" y="663" width="640" height="300" class="gb gbo" style="stroke-dasharray:5 4;stroke:rgba(78,148,230,.22)"/>
+<text x="840" y="820" class="t tm td" style="font-size:13px;" text-anchor="middle" dominant-baseline="central">×N</text>
+<text x="205" y="683" class="t tm tb" style="font-size:10px;" text-anchor="start" dominant-baseline="central">Decoder Layer</text>
+
+<!-- Self-Attention -->
+<rect x="270" y="700" width="220" height="42" class="sb sbo"/>
+<text x="380" y="715" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Self-Attention</text>
+<text x="380" y="731" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">LayerNorm → MHA → Residual</text>
+<line x1="380" y1="742" x2="380" y2="764" class="ar" marker-end="url(#ah)"/>
+
+<!-- Global z Injection -->
+<rect x="270" y="768" width="220" height="42" class="sb sbo"/>
+<text x="380" y="783" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Global z Injection</text>
+<text x="380" y="799" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Linear(z) → Residual</text>
+
+<!-- z arrow to global injection -->
+<path d="M380,510 L160,510 L160,789 L270,789" style="stroke:var(--purple);stroke-width:1.8;fill:none;" marker-end="url(#ahp)"/>
+
+<line x1="380" y1="810" x2="380" y2="833" class="arn" marker-end="url(#ahr)"/>
+
+<!-- *** NEW: Constraint Cross-Attention *** -->
+<rect x="240" y="837" width="280" height="50" class="sb sbn"/>
+<rect x="490" y="837" width="38" height="15" class="badge-bg"/>
+<text x="509" y="845" class="badge-tx">NEW</text>
+<text x="380" y="855" class="t tr" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Constraint Cross-Attention</text>
+<text x="380" y="873" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">MHA(Q=H, K=C, V=C) → Residual</text>
+
+<!-- C arrow into cross-attention -->
+<path d="M740,512 L740,862 L520,862" class="arn" marker-end="url(#ahr)"/>
+
+<!-- annotation left of cross-attn -->
+<text x="230" y="855" class="t tm" style="font-size:9px;fill:var(--red-light);text-anchor:end;" dominant-baseline="central">Q = H (hidden)</text>
+<text x="230" y="870" class="t tm" style="font-size:9px;fill:var(--red-light);text-anchor:end;" dominant-baseline="central">K, V = C (constraints)</text>
+
+<line x1="380" y1="887" x2="380" y2="910" class="ar" marker-end="url(#ah)"/>
+
+<!-- FFN -->
+<rect x="270" y="914" width="220" height="42" class="sb sbo"/>
+<text x="380" y="929" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Feed-Forward Network</text>
+<text x="380" y="945" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">LayerNorm → MLP → Residual</text>
+
+<!-- new layer annotation -->
+<text x="205" y="838" class="t tm" style="font-size:10px;fill:var(--red);" text-anchor="start" dominant-baseline="central">↓ 新增层</text>
+
+<!-- ========== OUTPUT HEADS ========== -->
+<line x1="380" y1="970" x2="380" y2="1050" class="ar" marker-end="url(#ah)"/>
+
+<text x="225" y="1055" class="t tm td" style="font-size:11px;letter-spacing:2px;">OUTPUT HEADS</text>
+
+<!-- FCN -->
+<rect x="225" y="1070" width="250" height="54" class="bk bg"/>
+<text x="350" y="1090" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">FCN 输出头</text>
+<text x="350" y="1110" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Command Logits + Args Logits</text>
+
+<!-- Constraint Prediction Head -->
+<rect x="530" y="1070" width="260" height="54" class="bk bgn"/>
+<rect x="755" y="1070" width="38" height="15" class="badge-bg"/>
+<text x="774" y="1078" class="badge-tx">NEW</text>
+<text x="660" y="1090" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">约束预测头</text>
+<text x="660" y="1110" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Constraint Prediction Head</text>
+
+<!-- arrow from decoder to constraint head -->
+<path d="M440,1035 L660,1035 L660,1070" class="arn" marker-end="url(#ahr)"/>
+
+<!-- arrows down -->
+<line x1="350" y1="1124" x2="350" y2="1160" class="ar" marker-end="url(#ah)"/>
+<line x1="660" y1="1124" x2="660" y2="1160" class="arn" marker-end="url(#ahr)"/>
+
+<!-- output labels -->
+<rect x="268" y="1165" width="166" height="34" class="bk bg" style="fill:rgba(72,199,116,.14);"/>
+<text x="350" y="1182" class="t tg" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">CAD 命令序列</text>
+
+<rect x="578" y="1165" width="166" height="34" class="bk bgn" style="filter:none;fill:rgba(232,80,79,.1);"/>
+<text x="660" y="1182" class="t tr" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">约束标签</text>
+
+<!-- ========== LOSS ========== -->
+<line x1="350" y1="1199" x2="350" y2="1248" class="ar" marker-end="url(#ah)"/>
+<line x1="660" y1="1199" x2="660" y2="1248" class="arn" marker-end="url(#ahr)"/>
+
+<text x="225" y="1248" class="t tm td" style="font-size:11px;letter-spacing:2px;">LOSS</text>
+
+<rect x="265" y="1260" width="170" height="42" class="bk bl"/>
+<text x="350" y="1275" class="t to" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">L_cmd</text>
+<text x="350" y="1292" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">命令交叉熵损失</text>
+
+<rect x="575" y="1260" width="170" height="42" class="bk bln"/>
+<rect x="712" y="1260" width="38" height="15" class="badge-bg"/>
+<text x="731" y="1268" class="badge-tx">NEW</text>
+<text x="660" y="1275" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">L_constraint</text>
+<text x="660" y="1292" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">约束一致性损失</text>
+
+<!-- arrows to total -->
+<line x1="350" y1="1302" x2="350" y2="1340" class="ar" marker-end="url(#ah)"/>
+<line x1="660" y1="1302" x2="660" y2="1340" class="arn" marker-end="url(#ahr)"/>
+
+<!-- plus -->
+<text x="505" y="1330" class="t" style="font-size:18px;fill:var(--text-dim);" text-anchor="middle" dominant-baseline="central">+</text>
+<text x="540" y="1330" class="t tm td" style="font-size:12px;" text-anchor="middle" dominant-baseline="central">α ·</text>
+
+<!-- Total Loss -->
+<rect x="278" y="1345" width="454" height="48" class="bk" style="fill:rgba(237,169,78,.1);stroke:var(--orange);stroke-width:2.5;"/>
+<text x="505" y="1362" class="t" style="font-size:15px;font-weight:700;" text-anchor="middle" dominant-baseline="central">L_total = L_cmd + α · L_constraint</text>
+<text x="505" y="1382" class="t tm to" style="font-size:11px;" text-anchor="middle" dominant-baseline="central">α = 0.1 ~ 0.5</text>
+
+<!-- ========== EVALUATION ========== -->
+<line x1="505" y1="1393" x2="505" y2="1434" class="ar" marker-end="url(#ah)"/>
+
+<text x="225" y="1442" class="t tm td" style="font-size:11px;letter-spacing:2px;">EVALUATION</text>
+
+<rect x="250" y="1455" width="210" height="50" class="bk bo" style="fill:rgba(78,148,230,.06);"/>
+<text x="355" y="1474" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">几何评估</text>
+<text x="355" y="1492" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Chamfer / Hausdorff Distance</text>
+
+<rect x="510" y="1455" width="280" height="50" class="bk bn"/>
+<rect x="755" y="1455" width="38" height="15" class="badge-bg"/>
+<text x="774" y="1463" class="badge-tx">NEW</text>
+<text x="650" y="1474" class="t tr" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">约束满足率评估</text>
+<text x="650" y="1492" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">H / V / Parallel / Perp / Collinear Rate</text>
+
+<!-- ========== SUMMARY ANNOTATION (bottom right) ========== -->
+<rect x="115" y="1540" width="830" height="100" rx="8" ry="8" fill="rgba(255,255,255,.02)" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+<text x="530" y="1565" class="t" style="font-size:13px;font-weight:700;fill:var(--text-dim);" text-anchor="middle" dominant-baseline="central">SUMMARY OF NEW MODULES (本文新增)</text>
+
+<text x="160" y="1590" class="t tm tr" style="font-size:11px;" dominant-baseline="central">①</text>
+<text x="175" y="1590" class="t" style="font-size:12px;fill:var(--red-light);" dominant-baseline="central">约束自动提取器 (Constraint Extractor)</text>
+
+<text x="500" y="1590" class="t tm tr" style="font-size:11px;" dominant-baseline="central">②</text>
+<text x="515" y="1590" class="t" style="font-size:12px;fill:var(--red-light);" dominant-baseline="central">约束编码模块 (Constraint Embedding)</text>
+
+<text x="160" y="1618" class="t tm tr" style="font-size:11px;" dominant-baseline="central">③</text>
+<text x="175" y="1618" class="t" style="font-size:12px;fill:var(--red-light);" dominant-baseline="central">约束交叉注意力 (Constraint Cross-Attention)</text>
+
+<text x="500" y="1618" class="t tm tr" style="font-size:11px;" dominant-baseline="central">④</text>
+<text x="515" y="1618" class="t" style="font-size:12px;fill:var(--red-light);" dominant-baseline="central">约束预测头 (Constraint Prediction Head)</text>
+
+<text x="780" y="1618" class="t tm tr" style="font-size:11px;" dominant-baseline="central">⑤</text>
+<text x="795" y="1618" class="t" style="font-size:12px;fill:var(--red-light);" dominant-baseline="central">约束一致性损失</text>
+
+</svg>
+</div>
+</body>
+</html>

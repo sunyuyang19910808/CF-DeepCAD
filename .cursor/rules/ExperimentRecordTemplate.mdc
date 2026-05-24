@@ -1,0 +1,49 @@
+---
+description: CF-DeepCAD 实验记录 Markdown 的统一表格格式（评估 + loss 合表、每 5 epoch）
+globs: 论文尝试/**/*实验记录*.md,论文尝试/**/*记录模板*.md
+alwaysApply: false
+---
+
+# 实验记录模板格式（可复用）
+
+编辑或新建 `*实验记录*.md` / `*记录模板*.md` 时，遵循本格式；参考实例：`论文尝试/约束感知生成/6_constraint_fused_deepcad_high_modify/CAD-only消融与辅助损失Warmup训练100epoch实验记录模板.md`。
+
+## 文档章节（固定顺序）
+
+1. **实验命名**：实验 ID、`exp_name`、目的、状态  
+2. **问题基线快照**（可选）：单实验关键路径与指标  
+3. **训练命令记录**：实验 | 命令 | 开始/结束时间 | checkpoint（含 `epoch, step`）  
+4. **统一评估结果**：**所有实验一张表**（勿按 H1/H2 拆多张）  
+5. **判定摘要**：3–5 条结论 bullet  
+6. **统一训练 loss**：**所有实验一张表**（勿按实验拆章）  
+7. **实验产物索引**：实验 | `train_metrics.csv` | `train_metrics_per_epoch.csv` | 测试汇总 CSV/目录 | 备注  
+
+## §4 统一评估结果
+
+- **粒度**：每 **5 个 epoch** 一行（5, 10, 15, …）；训练中断时补 **`latest` 对应 epoch** 一行（标注「中断点」）。  
+- **首列**：`实验`（如 H0 / H1 CAD-only / H2 warmup mild），第二列 `epoch`。  
+- **必含列**：`ACC_cmd`、`ACC_param`、`ratio_h`、`ratio_v`、`parallel`（=`parallel_recall_index_aligned`）、`perpendicular`、`parse_fail`（=`n_parse_fail_pred`）、`ext_mismatch`（=`n_samples_extrude_count_mismatch`）、`结论`（checkpoint 文件名或阶段说明）。  
+- **参考行**：原始 DeepCAD、当前问题基线各一行。  
+- **未训练**：填 `—` 或 `待填`，勿留空表。  
+- **数据来源**：`evaluate` → `summary.json` + `evaluate_ae_acc.py` → `*_acc_stat.txt`；多 checkpoint 汇总为 `artifacts/h*_all_checkpoint_eval_summary.csv`。
+
+## §6 统一训练 loss
+
+- **粒度**：与 §4 对齐，每 **5 epoch** + 必要时 **latest epoch**；所有实验写在 **同一张表**，按实验 ID 分组排序（H0 → H1 → H2 → …）。  
+- **统计口径**：`train_metrics.csv` 按 **`step` 去重（保留最后一条）** 后，对 epoch 内求 **均值**；可生成 `artifacts/train_metrics_per_epoch.csv`。  
+- **表头（顺序固定）**：`实验 | epoch | loss | loss_cmd | loss_cmd_only | loss_args | pred_loss | recon_loss | unary_recon | pair_recon | geom_loss | geom_h | geom_v | geom_para | geom_perp | aux_α | aux_β | aux_γ`  
+- **列名对照**（表下注明）：`geom_*` ↔ `geom_horizontal` 等；`unary_recon` / `pair_recon` ↔ `unary_recon_loss` / `pair_recon_loss`。  
+- **数值**：保留 **4 位小数**；`loss_args` 为已乘 `loss_args_weight=2.0` 的日志值。  
+- **读表说明**（表前 bullet，按实验类型）：  
+  - CAD-only（α=β=γ=0、无 soft geom）：进反传 **`loss` = `loss_cmd`**；`geom_loss=0`，其余 aux 列仅日志。  
+  - 全辅助：写明 `aux_*` 是否 warmup；总 `loss` 含加权辅助项。  
+  - CSV 无 `aux_*` 列时：按 `config.txt` 填写有效系数。  
+- **勿**将 H0/H1/H2 的 loss 拆成 §7/§8 多个独立表；阶段观察用 3–5 条 bullet 对照 §4。  
+- **未启动实验**：表中占位一行，`—`。
+
+## 填写与自动化提示
+
+- 更新记录时优先从 `proj_log/.../<exp>/artifacts/train_metrics.csv` 与 checkpoint 评估汇总 CSV 拉数，避免手抄错位。  
+- §4 与 §6 的 **epoch 行应对齐**（同一 checkpoint 可交叉核对）。  
+- 路径前缀统一写 `proj_log/<方案族>/<exp_name>/`，长路径在 §7 用 `...` 缩写。  
+- 遵守 `CF-DeepCADAgreement.mdc`：评估仍基于 `P(S|z)`，不把约束当作推理必需输入。

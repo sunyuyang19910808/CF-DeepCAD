@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constraint-Fused DeepCAD Simplify Modify1 Low Risk — DDD 架构与模型信息流</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --card-bg: #181b24;
+    --text: #e4e6ed;
+    --text-dim: #7d819a;
+    --blue: #4e94e6;
+    --blue-light: #72b4ff;
+    --red: #e8504f;
+    --red-light: #ff7a7a;
+    --red-glow: rgba(232,80,79,0.18);
+    --green: #48c774;
+    --orange: #eda94e;
+    --purple: #a07de8;
+    --arrow: #555b78;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Sans 3','Noto Sans SC', sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 30px 10px 60px;
+  }
+
+  .wrap { width: 1120px; }
+
+  h1 {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-bottom: 4px;
+    background: linear-gradient(135deg,var(--blue-light),var(--orange));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .sub {
+    text-align:center;
+    font-size:13px;
+    color:var(--text-dim);
+    margin-bottom:12px;
+    font-weight:300;
+  }
+
+  .legend {
+    display:flex;
+    justify-content:center;
+    gap:24px;
+    flex-wrap:wrap;
+    margin-bottom: 24px;
+    font-size:13px;
+  }
+
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:14px; height:14px; border-radius:3px; border:2px solid; }
+  .dot.orig { border-color:var(--blue); background:rgba(78,148,230,.12); }
+  .dot.new  { border-color:var(--red);  background:var(--red-glow); }
+  .dot.mix  { border-color:var(--orange); background:rgba(237,169,78,.1); }
+
+  svg { display:block; margin:0 auto; }
+
+  .t  { font-family:'Source Sans 3','Noto Sans SC',sans-serif; fill:var(--text); }
+  .td { fill:var(--text-dim); }
+  .tm { font-family:'JetBrains Mono',monospace; }
+  .tr { fill:var(--red-light); }
+  .tb { fill:var(--blue-light); }
+  .tg { fill:var(--green); }
+  .to { fill:var(--orange); }
+  .tp { fill:var(--purple); }
+
+  .bk { rx:7; ry:7; stroke-width:2; }
+  .bo { fill:rgba(78,148,230,.07); stroke:var(--blue); }
+  .bn { fill:var(--red-glow); stroke:var(--red); filter:url(#glow); }
+  .bg { fill:rgba(72,199,116,.08); stroke:var(--green); }
+  .bl { fill:rgba(237,169,78,.08); stroke:var(--orange); }
+  .bp { fill:rgba(160,125,232,.1); stroke:var(--purple); }
+  .bm { fill:rgba(237,169,78,.06); stroke:var(--orange); stroke-dasharray:5 4; }
+
+  .sb  { rx:5; ry:5; stroke-width:1.5; }
+  .sbo { fill:rgba(78,148,230,.1); stroke:rgba(78,148,230,.5); }
+  .sbn { fill:rgba(232,80,79,.08); stroke:rgba(232,80,79,.55); filter:url(#glow); }
+  .sbd { fill:rgba(160,125,232,.06); stroke:rgba(160,125,232,.45); stroke-dasharray:4 3; }
+
+  .gb { rx:10; ry:10; stroke-width:1.4; stroke-dasharray:7 5; fill:none; }
+  .gbo{ stroke:rgba(78,148,230,.28); }
+  .gbn{ stroke:rgba(232,80,79,.35); }
+
+  .ar  { stroke:var(--arrow); stroke-width:2; fill:none; }
+  .arn { stroke:var(--red); stroke-width:2; fill:none; }
+  .aro { stroke:var(--orange); stroke-width:2; fill:none; }
+  .ard { stroke-dasharray:6 4; }
+  .arp { stroke:var(--purple); stroke-width:1.8; fill:none; }
+
+  .badge-bg { fill:var(--red); rx:3; ry:3; }
+  .badge-tx { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; fill:#fff; text-anchor:middle; dominant-baseline:central; }
+
+  .panel {
+    margin-top: 28px;
+    padding: 20px 22px 24px;
+    background: var(--card-bg);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 10px;
+  }
+
+  .panel h2 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+
+  .panel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 900px) {
+    .panel-grid { grid-template-columns: 1fr; }
+  }
+
+  table.kv {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  table.kv th, table.kv td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    vertical-align: top;
+  }
+
+  table.kv th {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    color: var(--blue-light);
+    width: 42%;
+  }
+
+  table.kv td { color: var(--text); }
+  table.kv tr:last-child th, table.kv tr:last-child td { border-bottom: none; }
+
+  .doc-ref {
+    margin-top: 16px;
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.55;
+  }
+
+  .ctx-svg { margin-bottom: 8px; }
+  .ctx-title {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Constraint-Fused DeepCAD Simplify Modify1 Low Risk</h1>
+  <p class="sub">DDD 详细设计视角 — 保留 Modify1 主干 · 聚焦 supervision-to-metric 对齐 · 强化 LINE 相关重建与评估闭环</p>
+  <div class="legend">
+    <span><div class="dot orig"></div> Modify1 已有主干</span>
+    <span><div class="dot mix"></div> 保留的轻量融合路径</span>
+    <span><div class="dot new"></div> <b style="color:var(--red-light)">Low Risk 新增训练编排</b></span>
+  </div>
+
+  <p class="ctx-title">限界上下文与上下文映射（Context Map）</p>
+  <svg class="ctx-svg" width="1100" height="308" viewBox="0 0 1100 308" role="img" aria-label="DDD 限界上下文映射">
+    <defs>
+      <marker id="ctx-ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--arrow)" stroke-width="1.4"/>
+      </marker>
+      <marker id="ctx-ahr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--red)" stroke-width="1.4"/>
+      </marker>
+      <marker id="ctx-aho" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--orange)" stroke-width="1.4"/>
+      </marker>
+    </defs>
+    <rect x="350" y="12" width="400" height="46" class="bk bg" rx="7" ry="7" style="stroke-width:2;"/>
+    <text x="550" y="32" class="t" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Sketch Preparation Context</text>
+    <text x="550" y="50" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">H/V Extractor · BatchAssembler → constraint_tags / unary_gt / line masks</text>
+    <line x1="550" y1="58" x2="550" y2="80" class="ar" marker-end="url(#ctx-ah)"/>
+
+    <rect x="338" y="82" width="424" height="46" class="bk bo" rx="7" ry="7" style="stroke-width:2;"/>
+    <text x="550" y="102" class="t tb" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Encoding Context</text>
+    <text x="550" y="120" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">CADEmbedding + AxisTagEmbedding + EncoderSimplify + Pooling + Bottleneck → z</text>
+    <line x1="550" y1="128" x2="550" y2="150" class="ar" marker-end="url(#ctx-ah)"/>
+
+    <rect x="330" y="152" width="440" height="46" class="bk bo" rx="7" ry="7" style="stroke-width:2;"/>
+    <text x="550" y="172" class="t tb" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Generation Context</text>
+    <text x="550" y="190" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">DecoderAdapterModify1 + AxisReconHead + ConstraintPredHead → CAD logits / unary_pred / pred logits</text>
+    <line x1="550" y1="198" x2="550" y2="220" class="ar" marker-end="url(#ctx-ah)"/>
+
+    <rect x="254" y="222" width="592" height="54" class="bk bl" rx="7" ry="7" style="stroke-width:2;"/>
+    <text x="550" y="242" class="t to" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Training Orchestration Context</text>
+    <text x="550" y="260" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">LINE-only pred mask · line-weighted CE · alpha/gamma warmup · fixed metric loop</text>
+
+    <path d="M848,249 L988,249 L988,36 L770,36" class="ard" style="stroke:var(--orange);stroke-width:1.5;fill:none;opacity:.75;" marker-end="url(#ctx-aho)"/>
+    <text x="996" y="140" class="t tm td" style="font-size:10px;fill:var(--orange);" text-anchor="start">目标：不改主干，只修复监督与评估之间的错位</text>
+  </svg>
+
+<svg width="1100" height="2240" viewBox="0 0 1100 2240">
+<defs>
+  <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--arrow)" stroke-width="1.4"/>
+  </marker>
+  <marker id="ahr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--red)" stroke-width="1.4"/>
+  </marker>
+  <marker id="aho" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--orange)" stroke-width="1.4"/>
+  </marker>
+  <marker id="ahp" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--purple)" stroke-width="1.4"/>
+  </marker>
+  <filter id="glow" x="-18%" y="-18%" width="136%" height="136%">
+    <feGaussianBlur stdDeviation="5" result="b"/>
+    <feFlood flood-color="rgba(232,80,79,.22)" result="c"/>
+    <feComposite in="c" in2="b" operator="in" result="g"/>
+    <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+</defs>
+
+<line x1="82" y1="38" x2="82" y2="654" style="stroke:var(--purple);stroke-width:1;opacity:.3"/>
+<text x="62" y="345" class="t tm" style="font-size:11px;" transform="rotate(-90,62,345)" text-anchor="middle" fill="var(--purple)" opacity=".7">Encoding</text>
+
+<line x1="82" y1="680" x2="82" y2="1280" style="stroke:var(--blue);stroke-width:1;opacity:.3"/>
+<text x="62" y="980" class="t tm" style="font-size:11px;" transform="rotate(-90,62,980)" text-anchor="middle" fill="var(--blue)" opacity=".7">Generation</text>
+
+<line x1="82" y1="1310" x2="82" y2="2090" style="stroke:var(--orange);stroke-width:1;opacity:.3"/>
+<text x="62" y="1700" class="t tm" style="font-size:11px;" transform="rotate(-90,62,1700)" text-anchor="middle" fill="var(--orange)" opacity=".7">Training / Loss / Eval</text>
+
+<text x="230" y="14" class="t tm tg" style="font-size:11px;letter-spacing:1.2px;">Sketch Preparation Context · 数据入口</text>
+<text x="230" y="30" class="t tm td" style="font-size:11px;letter-spacing:2px;">INPUT（collate 张量 / 聚合根视图）</text>
+<rect x="230" y="42" width="300" height="44" class="bk bo"/>
+<text x="380" y="58" class="t" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">CAD 命令序列</text>
+<text x="380" y="76" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">commands + args (S × N)</text>
+
+<rect x="565" y="42" width="355" height="44" class="bk bn"/>
+<rect x="865" y="42" width="38" height="15" class="badge-bg"/>
+<text x="884" y="50" class="badge-tx">KEEP</text>
+<text x="742" y="58" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">H/V 监督视图</text>
+<text x="742" y="76" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">constraint_tags (S,2) + unary_gt (L,2) + line_cmd_mask / line_index_map</text>
+
+<line x1="380" y1="86" x2="380" y2="120" class="ar" marker-end="url(#ah)"/>
+<path d="M742,86 L742,108 L380,108 L380,120" class="arn ard" marker-end="url(#ahr)"/>
+
+<text x="230" y="134" class="t tm tr" style="font-size:11px;letter-spacing:1.2px;">Encoding Context</text>
+<text x="585" y="134" class="t tm td" style="font-size:10px;">Low Risk 保持 Modify1 的轻量 encoder 融合，不恢复 token 双流</text>
+<rect x="205" y="144" width="710" height="490" class="gb gbo"/>
+
+<rect x="245" y="160" width="280" height="60" class="bk bm"/>
+<rect x="470" y="160" width="38" height="15" class="badge-bg"/>
+<text x="489" y="168" class="badge-tx">KEEP</text>
+<text x="385" y="178" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">CADEmbedding + AxisTagEmbedding</text>
+<text x="385" y="197" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Cmd + Arg [+ Group] + AxisTag (2D) → Positional Encoding</text>
+<text x="385" y="211" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">只保留 Horizontal / Vertical 命令级 tag</text>
+<line x1="385" y1="220" x2="385" y2="256" class="ar" marker-end="url(#ah)"/>
+
+<rect x="585" y="160" width="290" height="60" class="bk sbd"/>
+<text x="730" y="180" class="t tp" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Still Not Introduced</text>
+<text x="730" y="199" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">ConstraintTokenEncoder / E_joint / SegmentEmbedding</text>
+<text x="730" y="213" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">Low Risk 继续保持 H/V-only 的轻量编码范围</text>
+
+<rect x="285" y="260" width="420" height="54" class="bk bo"/>
+<text x="495" y="279" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">TransformerEncoder（命令单流）×L</text>
+<text x="495" y="299" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Self-Attn → FFN，仅对带 AxisTag 的命令序列建模</text>
+<line x1="495" y1="314" x2="495" y2="350" class="ar" marker-end="url(#ah)"/>
+
+<rect x="330" y="354" width="330" height="46" class="bk bn"/>
+<rect x="605" y="354" width="38" height="15" class="badge-bg"/>
+<text x="624" y="362" class="badge-tx">KEEP</text>
+<text x="495" y="372" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Axis-Aware Pooling</text>
+<text x="495" y="390" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">masked mean pooling over command stream</text>
+<line x1="495" y1="400" x2="495" y2="436" class="ar" marker-end="url(#ah)"/>
+
+<rect x="405" y="442" width="180" height="40" class="bk bo"/>
+<text x="495" y="456" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Bottleneck</text>
+<text x="495" y="472" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">与 DeepCAD 主干兼容</text>
+<line x1="495" y1="482" x2="495" y2="518" class="ar" marker-end="url(#ah)"/>
+
+<rect x="430" y="524" width="130" height="34" class="bk bp"/>
+<text x="495" y="541" class="t tp" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">z（Axis-aware）</text>
+
+<path d="M560,541 L945,541 L945,650" class="arn ard" marker-end="url(#ahr)"/>
+<rect x="823" y="654" width="244" height="60" class="bk bn"/>
+<rect x="1012" y="654" width="38" height="15" class="badge-bg"/>
+<text x="1031" y="662" class="badge-tx">KEEP</text>
+<text x="945" y="675" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">AxisReconHead(z)</text>
+<text x="945" y="695" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">latent 侧 unary_pred (H/V only)</text>
+
+<text x="170" y="746" class="t tm tb" style="font-size:11px;letter-spacing:1.2px;">Generation Context</text>
+<text x="388" y="746" class="t tm td" style="font-size:11px;letter-spacing:2px;">Decoder 主链路保持不变</text>
+<rect x="165" y="756" width="740" height="480" class="gb gbo" style="stroke:rgba(78,148,230,.2)"/>
+
+<rect x="255" y="774" width="250" height="44" class="bk bo"/>
+<text x="380" y="790" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Const Embedding</text>
+<text x="380" y="808" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">decoder 输入位置编码，与 DeepCAD 一致</text>
+<line x1="380" y1="818" x2="380" y2="854" class="ar" marker-end="url(#ah)"/>
+
+<rect x="200" y="858" width="660" height="256" class="gb gbo" style="stroke-dasharray:5 4;stroke:rgba(78,148,230,.22)"/>
+<text x="214" y="878" class="t tm tb" style="font-size:10px;" text-anchor="start" dominant-baseline="central">Decoder Layer ×N</text>
+
+<rect x="270" y="894" width="220" height="40" class="sb sbo"/>
+<text x="380" y="910" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Self-Attention</text>
+<text x="380" y="926" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Pre-LN MHA + Residual</text>
+<line x1="380" y1="934" x2="380" y2="956" class="ar" marker-end="url(#ah)"/>
+
+<rect x="270" y="960" width="220" height="40" class="sb sbo"/>
+<text x="380" y="976" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Global z Injection</text>
+<text x="380" y="992" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Linear(z) → 约束语义经 z 注入</text>
+<path d="M495,558 L120,558 L120,980 L270,980" class="arp" marker-end="url(#ahp)"/>
+<line x1="380" y1="1000" x2="380" y2="1022" class="ar" marker-end="url(#ah)"/>
+
+<rect x="250" y="1026" width="260" height="44" class="sb sbd"/>
+<text x="380" y="1042" class="t tp" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Still Not Introduced</text>
+<text x="380" y="1058" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">No Constraint Cross-Attn(C) / No external C memory</text>
+<line x1="380" y1="1070" x2="380" y2="1092" class="ar" marker-end="url(#ah)"/>
+
+<rect x="270" y="1096" width="220" height="40" class="sb sbo"/>
+<text x="380" y="1112" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Feed-Forward Network</text>
+<text x="380" y="1128" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">LayerNorm → MLP → Residual</text>
+
+<line x1="380" y1="1136" x2="380" y2="1180" class="ar" marker-end="url(#ah)"/>
+<text x="230" y="1188" class="t tm td" style="font-size:11px;letter-spacing:2px;">OUTPUTS</text>
+
+<rect x="208" y="1200" width="290" height="54" class="bk bg"/>
+<text x="353" y="1219" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Cmd Head + Arg Head</text>
+<text x="353" y="1239" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">command_logits / args_logits，与 Modify1 一致</text>
+
+<rect x="560" y="1200" width="260" height="54" class="bk bn"/>
+<rect x="765" y="1200" width="38" height="15" class="badge-bg"/>
+<text x="784" y="1208" class="badge-tx">KEEP</text>
+<text x="690" y="1219" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">ConstraintPredHead</text>
+<text x="690" y="1239" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">decoder hidden → constraint_pred_logits (S,N,2)</text>
+
+<line x1="353" y1="1254" x2="353" y2="1298" class="ar" marker-end="url(#ah)"/>
+<rect x="238" y="1302" width="230" height="34" class="bk bg" style="fill:rgba(72,199,116,.14);"/>
+<text x="353" y="1319" class="t tg" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">命令 / 参数 logits</text>
+
+<line x1="690" y1="1254" x2="690" y2="1320" class="arn" marker-end="url(#ahr)"/>
+<rect x="588" y="1324" width="204" height="34" class="bk bn" style="filter:none;"/>
+<text x="690" y="1341" class="t tr" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">α · L_constraint_pred</text>
+
+<line x1="945" y1="714" x2="945" y2="1320" class="arn" marker-end="url(#ahr)"/>
+<rect x="842" y="1324" width="206" height="34" class="bk bn" style="filter:none;"/>
+<text x="945" y="1341" class="t tr" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">β · L_axis_recon</text>
+
+<text x="230" y="1394" class="t tm to" style="font-size:11px;letter-spacing:1.2px;">Training Orchestration · Low Risk 编排层</text>
+<rect x="150" y="1408" width="800" height="528" class="gb gbn"/>
+
+<rect x="200" y="1432" width="270" height="74" class="bk bn"/>
+<rect x="415" y="1432" width="38" height="15" class="badge-bg"/>
+<text x="434" y="1440" class="badge-tx">NEW</text>
+<text x="335" y="1452" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">LINE-only constraint_pred mask</text>
+<text x="335" y="1472" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">valid = (~cmd_padding_mask) AND line_cmd_mask</text>
+<text x="335" y="1490" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">只在真实 LINE token 上计算 L_constraint_pred</text>
+
+<rect x="520" y="1432" width="270" height="74" class="bk bn"/>
+<rect x="735" y="1432" width="38" height="15" class="badge-bg"/>
+<text x="754" y="1440" class="badge-tx">NEW</text>
+<text x="655" y="1452" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Line-weighted CommandCadLoss</text>
+<text x="655" y="1472" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">对 LINE 命令与 line 参数给予更高 CE 权重</text>
+<text x="655" y="1490" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">把主任务梯度更集中地压到 line 几何</text>
+
+<line x1="690" y1="1358" x2="335" y2="1432" class="arn ard" marker-end="url(#ahr)"/>
+<path d="M353,1336 L353,1380 L655,1380 L655,1432" class="aro ard" marker-end="url(#aho)"/>
+
+<rect x="200" y="1546" width="270" height="82" class="bk bn"/>
+<rect x="415" y="1546" width="38" height="15" class="badge-bg"/>
+<text x="434" y="1554" class="badge-tx">NEW</text>
+<text x="335" y="1566" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">alpha / gamma 调度</text>
+<text x="335" y="1588" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">warmup 或 staged ramp</text>
+<text x="335" y="1608" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">训练前期先保住 cmd_loss 主链路</text>
+
+<rect x="520" y="1546" width="270" height="82" class="bk bn"/>
+<rect x="735" y="1546" width="38" height="15" class="badge-bg"/>
+<text x="754" y="1554" class="badge-tx">KEEP</text>
+<text x="655" y="1566" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Differentiable Geometry Branch</text>
+<text x="655" y="1588" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Interpreter + Evaluator 保持不变</text>
+<text x="655" y="1608" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">只调整其在总损失中的时序与权重</text>
+
+<rect x="205" y="1668" width="590" height="104" class="bk" style="fill:rgba(237,169,78,.1);stroke:var(--orange);stroke-width:2.5;"/>
+<text x="500" y="1694" class="t" style="font-size:15px;font-weight:700;" text-anchor="middle" dominant-baseline="central">L_total = L_cmd_line_weighted + alpha_eff · L_constraint_pred_line_only + beta · L_axis_recon + gamma_eff · L_geom_constraint</text>
+<text x="500" y="1720" class="t tm to" style="font-size:11px;" text-anchor="middle" dominant-baseline="central">Low Risk 不改变总损失的大框架，只改变 pred loss 的 mask、cmd loss 的权重以及 alpha/gamma 的生效节奏</text>
+<text x="500" y="1744" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">核心目标：让现有监督更准确地作用到真正决定 R_h / R_v 的 line 位置与 line 参数上</text>
+
+<line x1="335" y1="1628" x2="335" y2="1668" class="arn" marker-end="url(#ahr)"/>
+<line x1="655" y1="1628" x2="655" y2="1668" class="arn" marker-end="url(#ahr)"/>
+<line x1="945" y1="1358" x2="735" y2="1546" class="arn ard" marker-end="url(#ahr)"/>
+
+<rect x="820" y="1432" width="104" height="340" class="bk sbd" style="filter:none;"/>
+<text x="872" y="1456" class="t tp" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Still Not</text>
+<text x="872" y="1474" class="t tp" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Introduced</text>
+<text x="872" y="1506" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">No pair-level</text>
+<text x="872" y="1522" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">parallel /</text>
+<text x="872" y="1538" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">perpendicular</text>
+<text x="872" y="1568" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">No inference-time</text>
+<text x="872" y="1584" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">snapping /</text>
+<text x="872" y="1600" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">hard projection</text>
+<text x="872" y="1630" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">No encoder /</text>
+<text x="872" y="1646" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">decoder trunk</text>
+<text x="872" y="1662" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">rewrite</text>
+
+<text x="230" y="1810" class="t tm to" style="font-size:11px;letter-spacing:1.2px;">实施阶段与验证闭环</text>
+<rect x="186" y="1826" width="740" height="248" class="gb gbo"/>
+
+<rect x="220" y="1856" width="140" height="84" class="bk bo"/>
+<text x="290" y="1880" class="t tb" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Phase 0</text>
+<text x="290" y="1902" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">范围冻结</text>
+<text x="290" y="1920" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">只改 loss / mask / 调度</text>
+
+<rect x="390" y="1856" width="140" height="84" class="bk bl"/>
+<text x="460" y="1880" class="t to" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Phase 1</text>
+<text x="460" y="1902" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">监督对齐</text>
+<text x="460" y="1920" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">LINE-only pred loss</text>
+
+<rect x="560" y="1856" width="140" height="84" class="bk bl"/>
+<text x="630" y="1880" class="t to" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Phase 2</text>
+<text x="630" y="1902" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">主任务加权</text>
+<text x="630" y="1920" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">line-aware CE</text>
+
+<rect x="730" y="1856" width="160" height="84" class="bk bl"/>
+<text x="810" y="1880" class="t to" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Phase 3</text>
+<text x="810" y="1902" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">调度与日志</text>
+<text x="810" y="1920" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">alpha/gamma warmup</text>
+
+<line x1="360" y1="1898" x2="390" y2="1898" class="ar" marker-end="url(#ah)"/>
+<line x1="530" y1="1898" x2="560" y2="1898" class="ar" marker-end="url(#ah)"/>
+<line x1="700" y1="1898" x2="730" y2="1898" class="ar" marker-end="url(#ah)"/>
+
+<rect x="302" y="1974" width="508" height="68" class="bk bn"/>
+<rect x="755" y="1974" width="38" height="15" class="badge-bg"/>
+<text x="774" y="1982" class="badge-tx">NEW</text>
+<text x="556" y="1996" class="t tr" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Phase 4：统一评估与对比结论</text>
+<text x="556" y="2018" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">固定 angle_thresh = 0.1，统一记录 R_h、R_v、parallel_recall_index_aligned、perpendicular_recall_index_aligned、n_parse_fail_pred</text>
+
+<line x1="556" y1="2042" x2="556" y2="2082" class="ar" marker-end="url(#ah)"/>
+
+<text x="230" y="2106" class="t tm td" style="font-size:11px;letter-spacing:2px;">EVALUATION（固定口径）</text>
+<rect x="248" y="2120" width="250" height="48" class="bk bo"/>
+<text x="373" y="2138" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Reconstruction</text>
+<text x="373" y="2156" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">checkpoint → reconstruction/*_vec.h5</text>
+
+<rect x="614" y="2120" width="250" height="48" class="bk bn"/>
+<rect x="809" y="2120" width="38" height="15" class="badge-bg"/>
+<text x="828" y="2128" class="badge-tx">KEEP</text>
+<text x="739" y="2138" class="t tr" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">固定验证指标</text>
+<text x="739" y="2156" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">R_h / R_v / aligned recall / parse fail</text>
+</svg>
+
+  <div class="panel">
+    <h2>Low Risk 关键设计点</h2>
+    <div class="panel-grid">
+      <table class="kv">
+        <tr><th>主干保持</th><td>保留 <code>AxisTagEmbedding</code>、<code>EncoderSimplify</code>、<code>DecoderAdapterModify1</code>、<code>ConstraintPredHead</code>、<code>AxisReconHead</code>、<code>DifferentiableSketchInterpreter</code>、<code>ConstraintEvaluator</code>。</td></tr>
+        <tr><th>监督对齐</th><td><code>constraint_pred_loss</code> 从“所有非 padding token”收缩到“仅 LINE token”，让 decoder 侧监督真正落到 H/V 相关位置。</td></tr>
+        <tr><th>主任务增强</th><td>在 <code>CommandCadLoss</code> 中提高 <code>LINE</code> 命令与 line 参数的 CE 权重，增强对最终离散几何的直接控制。</td></tr>
+        <tr><th>调度能力</th><td>通过 <code>alpha/gamma</code> warmup 或 staged ramp，降低辅助损失在早期对主重建链路的干扰。</td></tr>
+      </table>
+      <table class="kv">
+        <tr><th>评估闭环</th><td>固定使用统一口径的 <code>R_h</code>、<code>R_v</code>、aligned recall 与 parse fail 指标做实验对比，而不是只依赖训练 loss。</td></tr>
+        <tr><th>风险控制</th><td>不新增 pair-level 训练、不引入推理期 snapping / hard projection、不改 encoder / decoder 主干，确保本轮方案低风险、易回退。</td></tr>
+        <tr><th>适用场景</th><td>适合先验证“当前 Modify1 架构是否仍有低成本增量空间”，再决定是否进入中风险结构改造。</td></tr>
+        <tr><th>升级判据</th><td>若 Low Risk 后 <code>R_h</code>/<code>R_v</code> 仍无明显改善，则应转向中风险方案：pair-level 几何损失与更强结构对齐。</td></tr>
+      </table>
+    </div>
+    <p class="doc-ref">本图对应文档：<code>Constraint-Fused DeepCAD Simplify Modify1 Low Risk DDD技术方案.md</code>。当前版本按参考的 <code>constraint_fused_deepcad_simplify_modify1_architecture.html</code> 重写：保留相同的上下文映射、主链路层次和 SVG 信息密度，只把内容替换为 Low Risk 方案。</p>
+  </div>
+</div>
+</body>
+</html>

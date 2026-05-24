@@ -1,0 +1,9 @@
+id,n_lines_gt,n_lines_pred,n_line_cmds_gt,n_line_cmds_pred,gt_h,gt_v,pred_h,pred_v,ratio_h_sample,ratio_v_sample,par_recall_hits,par_recall_denom,par_recall_index_aligned,perp_recall_hits,perp_recall_denom,perp_recall_index_aligned,pair_recall_extrude_count_mismatch,pair_recall_extrudes_skipped_line_mismatch,parse_ok_gt,parse_ok_pred
+00071257,0,0,0,0,0,0,0,0,,,0,0,,0,0,,True,0,True,True
+00126167,4,0,4,0,2,2,0,0,0.0,0.0,0,0,,0,0,,True,0,True,True
+00262263,0,0,0,0,0,0,0,0,,,0,0,,0,0,,True,0,True,True
+00286420,8,0,8,0,4,4,0,0,0.0,0.0,0,0,,0,0,,True,0,True,True
+00368375,0,0,0,0,0,0,0,0,,,0,0,,0,0,,True,0,True,True
+00732275,4,0,4,0,2,2,0,0,0.0,0.0,0,0,,0,0,,True,0,True,True
+00802258,0,0,0,0,0,0,0,0,,,0,0,,0,0,,True,0,True,True
+00827996,14,0,14,0,0,2,0,0,,0.0,0,0,,0,0,,True,0,True,True

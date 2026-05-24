@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constraint-Fused DeepCAD Simplify Modify2 Low Risk — DDD 架构与模型信息流</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --card-bg: #181b24;
+    --text: #e4e6ed;
+    --text-dim: #7d819a;
+    --blue: #4e94e6;
+    --blue-light: #72b4ff;
+
+
+    
+    --red: #e8504f;
+    --red-light: #ff7a7a;
+    --red-glow: rgba(232,80,79,0.18);
+    --green: #48c774;
+    --orange: #eda94e;
+    --purple: #a07de8;
+    --arrow: #555b78;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Sans 3','Noto Sans SC', sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 30px 10px 60px;
+  }
+
+  .wrap { width: 1080px; }
+
+  h1 {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-bottom: 4px;
+    background: linear-gradient(135deg,var(--blue-light),var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .sub { text-align:center; font-size:13px; color:var(--text-dim); margin-bottom:12px; font-weight:300; }
+
+  .legend {
+    display:flex; justify-content:center; gap:24px; flex-wrap:wrap;
+    margin-bottom: 24px; font-size:13px;
+  }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:14px; height:14px; border-radius:3px; border:2px solid; }
+  .dot.orig { border-color:var(--blue); background:rgba(78,148,230,.12); }
+  .dot.new  { border-color:var(--red);  background:var(--red-glow); }
+  .dot.mix  { border-color:var(--orange); background:rgba(237,169,78,.1); }
+
+  svg { display:block; margin:0 auto; }
+
+  .t  { font-family:'Source Sans 3','Noto Sans SC',sans-serif; fill:var(--text); }
+  .td { fill:var(--text-dim); }
+  .tm { font-family:'JetBrains Mono',monospace; }
+  .tr { fill:var(--red-light); }
+  .tb { fill:var(--blue-light); }
+  .tg { fill:var(--green); }
+  .to { fill:var(--orange); }
+  .tp { fill:var(--purple); }
+
+  .bk { rx:7; ry:7; stroke-width:2; }
+  .bo { fill:rgba(78,148,230,.07); stroke:var(--blue); }
+  .bn { fill:var(--red-glow); stroke:var(--red); filter:url(#glow); }
+  .bg { fill:rgba(72,199,116,.08); stroke:var(--green); }
+  .bgn{ fill:var(--red-glow); stroke:var(--red); filter:url(#glow); }
+  .bl { fill:rgba(237,169,78,.08); stroke:var(--orange); }
+  .bln{ fill:var(--red-glow); stroke:var(--red); filter:url(#glow); }
+  .bp { fill:rgba(160,125,232,.1); stroke:var(--purple); }
+  .bm { fill:rgba(237,169,78,.06); stroke:var(--orange); stroke-dasharray:5 4; }
+
+  .sb  { rx:5; ry:5; stroke-width:1.5; }
+  .sbo { fill:rgba(78,148,230,.1); stroke:rgba(78,148,230,.5); }
+  .sbn { fill:rgba(232,80,79,.08); stroke:rgba(232,80,79,.55); filter:url(#glow); }
+  .sbd { fill:rgba(160,125,232,.06); stroke:rgba(160,125,232,.45); stroke-dasharray:4 3; }
+
+  .gb { rx:10; ry:10; stroke-width:1.4; stroke-dasharray:7 5; fill:none; }
+  .gbo{ stroke:rgba(78,148,230,.28); }
+  .gbn{ stroke:rgba(232,80,79,.35); }
+
+  .ar  { stroke:var(--arrow); stroke-width:2; fill:none; }
+  .arn { stroke:var(--red); stroke-width:2; fill:none; }
+  .ard { stroke-dasharray:6 4; }
+  .arp { stroke:var(--purple); stroke-width:1.8; fill:none; }
+
+  .badge-bg { fill:var(--red); rx:3; ry:3; }
+  .badge-tx { font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; fill:#fff; text-anchor:middle; dominant-baseline:central; }
+
+  .brk { stroke:var(--text-dim); stroke-width:1; fill:none; stroke-dasharray:4 3; }
+
+  .panel {
+    margin-top: 28px;
+    padding: 20px 22px 24px;
+    background: var(--card-bg);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 10px;
+  }
+  .panel h2 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+  .panel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 900px) {
+    .panel-grid { grid-template-columns: 1fr; }
+  }
+  table.kv {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  table.kv th, table.kv td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    vertical-align: top;
+  }
+  table.kv th {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    color: var(--blue-light);
+    width: 42%;
+  }
+  table.kv td { color: var(--text); }
+  table.kv tr:last-child th, table.kv tr:last-child td { border-bottom: none; }
+  .doc-ref {
+    margin-top: 16px;
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.55;
+  }
+  .doc-ref a { color: var(--blue-light); text-decoration: none; }
+  .doc-ref a:hover { text-decoration: underline; }
+
+  .ctx-svg { margin-bottom: 8px; }
+  .ctx-title {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Constraint-Fused DeepCAD Simplify Modify2 Low Risk</h1>
+  <p class="sub">DDD 详细设计视角 — 保留 Modify2 四类约束与整体包结构 · 仅增量修复 decoder 约束通路 / pair 重建结构 / LINE-only 监督 · 实现落在 `constraint_fused_deepcad_simplify_modify2_low_risk/`</p>
+  <div class="legend">
+    <span><div class="dot.orig"></div> DeepCAD 主干（层结构不变）</span>
+    <span><div class="dot.mix"></div> Modify2 已有联合编码与评估闭环（保留）</span>
+    <span><div class="dot.new"></div> <b style="color:var(--red-light)">NEW — Low Risk 增量：decoder 直读约束 / pair scorer / LINE-only pred</b></span>
+    <span style="color:var(--green);"><svg width="28" height="14" style="vertical-align:middle;margin-right:4px;"><path d="M2,7 L26,7" stroke="var(--green)" stroke-width="2" stroke-dasharray="6 4" fill="none"/></svg>绿色虚线：batch 监督（unary_gt · pair_gt · line_count）；<code>line_mask = build_line_mask(line_count, max_lines)</code> 在 <code>train_use_case.execute</code> 内计算后同时喂给 β 的 <code>compose_recon_loss</code> 与 γ 的 <code>DifferentiableConstraintEvaluator</code>（非 batch 独立字段）</span>
+    <span style="color:var(--blue-light);"><svg width="28" height="14" style="vertical-align:middle;margin-right:4px;"><path d="M2,7 L26,7" stroke="var(--blue-light)" stroke-width="2" stroke-dasharray="5 4" fill="none"/></svg>蓝色虚线：batch line_cmd_mask / line_index_map（→ Interpreter 与 gather_line_features / ReconHead）</span>
+  </div>
+
+  <p class="ctx-title">限界上下文与上下文映射（Context Map）</p>
+  <svg class="ctx-svg" width="1060" height="300" viewBox="0 0 1060 300" role="img" aria-label="DDD 限界上下文映射">
+    <defs>
+      <marker id="ctx-ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--arrow)" stroke-width="1.4"/>
+      </marker>
+      <marker id="ctx-ahr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--red)" stroke-width="1.4"/>
+      </marker>
+      <marker id="ctx-aho" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--orange)" stroke-width="1.4"/>
+      </marker>
+    </defs>
+    <rect x="330" y="12" width="400" height="46" class="bk bg" rx="7" ry="7" style="stroke-width:2;"/>
+    <text x="530" y="32" class="t" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Sketch Preparation Context</text>
+    <text x="530" y="50" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Extractor · BatchAssembler → constraint_tags / constraint_tokens / unary_gt / pair_gt（四类约束保持不变）</text>
+    <line x1="530" y1="58" x2="530" y2="78" class="ar" marker-end="url(#ctx-ah)"/>
+
+    <rect x="300" y="78" width="460" height="46" class="bk bgn" rx="7" ry="7" style="stroke-width:2;filter:none;"/>
+    <text x="530" y="98" class="t tr" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Constraint-Fused Encoding Context</text>
+    <text x="530" y="116" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">CADEmbeddingFused · ConstraintTokenEncoder · EncoderFused · Pooling · Bottleneck → z + constraint_memory + line-level memory</text>
+    <line x1="530" y1="124" x2="530" y2="144" class="arn" marker-end="url(#ctx-ahr)"/>
+
+    <rect x="330" y="144" width="400" height="46" class="bk bo" rx="7" ry="7" style="stroke-width:2;"/>
+    <text x="530" y="164" class="t tb" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Generation Context</text>
+    <text x="530" y="182" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">TransformerDecoder ×N → OptionalConstraintCrossAttn(C) ×1 + FCN · ConstraintPredHead + UnaryRecon / LinePairReconScorer</text>
+    <line x1="530" y1="190" x2="530" y2="210" class="ar" marker-end="url(#ctx-ah)"/>
+
+    <rect x="280" y="210" width="500" height="46" class="bk bl" rx="7" ry="7" style="stroke-width:2;"/>
+    <text x="530" y="230" class="t to" style="font-size:13px;font-weight:700;" text-anchor="middle" dominant-baseline="central">Training Orchestration Context</text>
+    <text x="530" y="248" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">LossComposer · LINE-only pred_loss · fixed eval loop · 日志与 checkpoint（总损失结构保持兼容）</text>
+
+    <path d="M780,233 L920,233 L920,36 L740,36" class="ard" style="stroke:var(--orange);stroke-width:1.5;fill:none;opacity:.75;" marker-end="url(#ctx-aho)"/>
+    <text x="928" y="130" class="t tm td" style="font-size:10px;fill:var(--orange);" text-anchor="start">Low Risk 仅加强 decoder 通路、pair scorer 与 LINE-only 监督；评估口径保持不变</text>
+  </svg>
+
+<svg width="1060" height="2140" viewBox="0 0 1060 2140">
+<defs>
+  <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--arrow)" stroke-width="1.4"/>
+  </marker>
+  <marker id="ahr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--red)" stroke-width="1.4"/>
+  </marker>
+  <marker id="ahp" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--purple)" stroke-width="1.4"/>
+  </marker>
+  <marker id="aho" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--orange)" stroke-width="1.4"/>
+  </marker>
+  <marker id="ahg" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <path d="M0,0 L8,3 L0,6" fill="none" stroke="var(--green)" stroke-width="1.4"/>
+  </marker>
+  <filter id="glow" x="-18%" y="-18%" width="136%" height="136%">
+    <feGaussianBlur stdDeviation="5" result="b"/>
+    <feFlood flood-color="rgba(232,80,79,.22)" result="c"/>
+    <feComposite in="c" in2="b" operator="in" result="g"/>
+    <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+</defs>
+
+<!-- Phase sidebar -->
+<line x1="82" y1="38" x2="82" y2="620" style="stroke:var(--purple);stroke-width:1;opacity:.3"/>
+<text x="62" y="330" class="t tm" style="font-size:11px;" transform="rotate(-90,62,330)" text-anchor="middle" fill="var(--purple)" opacity=".7">Encoding (Fused)</text>
+
+<line x1="82" y1="648" x2="82" y2="1180" style="stroke:var(--blue);stroke-width:1;opacity:.3"/>
+<text x="62" y="915" class="t tm" style="font-size:11px;" transform="rotate(-90,62,915)" text-anchor="middle" fill="var(--blue)" opacity=".7">Decoding</text>
+
+<line x1="82" y1="1200" x2="82" y2="2120" style="stroke:var(--orange);stroke-width:1;opacity:.3"/>
+<text x="62" y="1660" class="t tm" style="font-size:11px;" transform="rotate(-90,62,1660)" text-anchor="middle" fill="var(--orange)" opacity=".7">Orchestration / Loss &amp; Aux</text>
+
+<!-- ========== INPUT ========== -->
+<text x="225" y="14" class="t tm tg" style="font-size:11px;letter-spacing:1.2px;">Sketch Preparation Context · 数据入口</text>
+<text x="225" y="30" class="t tm td" style="font-size:11px;letter-spacing:2px;">INPUT（沿用 Modify2 契约）</text>
+<rect x="225" y="42" width="280" height="44" class="bk bo"/>
+<text x="365" y="58" class="t" style="font-size:14px;font-weight:600;" text-anchor="middle" dominant-baseline="central">CAD 命令序列</text>
+<text x="365" y="76" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">commands + args (S × N)</text>
+
+<rect x="530" y="42" width="350" height="44" class="bk bn"/>
+<rect x="825" y="42" width="38" height="15" class="badge-bg"/>
+<text x="844" y="50" class="badge-tx">NEW</text>
+<text x="705" y="58" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">四类约束监督张量</text>
+<text x="705" y="76" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">constraint_tags + relations + unary_gt + pair_gt + line_count + line_cmd_mask + line_index_map（契约不变）· recon/geom 用的 line_mask 由 build_line_mask(line_count, max_lines) 在 execute 内生成</text>
+
+<line x1="365" y1="86" x2="365" y2="118" class="ar" marker-end="url(#ah)"/>
+<path d="M705,86 L705,108 L365,108 L365,118" class="arn ard" marker-end="url(#ahr)"/>
+
+<!-- compose_recon_loss 的 GT：直达 LossComposer.compose；不经 ConstraintReconHead -->
+<path d="M865,86 L865,320 L1025,320 L1025,1405 L590,1405 L590,1440" fill="none" stroke="var(--green)" stroke-width="1.75" stroke-dasharray="7 5" opacity="0.92" marker-end="url(#ahg)"/>
+<text x="1032" y="318" class="t tg" style="font-size:10px;font-weight:600;" text-anchor="start" dominant-baseline="central">GT → β（compose_recon_loss）</text>
+<text x="1032" y="332" class="t tm td" style="font-size:9px;fill:var(--green);" text-anchor="start" dominant-baseline="central">unary_gt · pair_gt · line_mask（= build_line_mask(line_count, unary_logits.size(1))）</text>
+
+<!-- ========== ENCODER ========== -->
+<text x="225" y="132" class="t tm tr" style="font-size:11px;letter-spacing:1.2px;">Constraint-Fused Encoding Context</text>
+<text x="488" y="132" class="t tm td" style="font-size:10px;">EncoderFused：嵌入拼接 → Self-Attn×L → Pooling → z_pre + constraint_memory + line memory</text>
+<rect x="200" y="142" width="680" height="520" class="gb gbo"/>
+
+<!-- CADEmbeddingFused -->
+<rect x="240" y="158" width="250" height="58" class="bk bm"/>
+<rect x="445" y="158" width="38" height="15" class="badge-bg"/>
+<text x="464" y="166" class="badge-tx">NEW</text>
+<text x="365" y="174" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">CADEmbeddingFused + 约束标记</text>
+<text x="365" y="192" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Cmd + Arg [+ Group] + ConstraintTag (p_i ∈ ℝ⁴) → Pos</text>
+<text x="365" y="206" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">Low Risk 保持四类约束与原有 embedding 入口不变</text>
+<line x1="365" y1="216" x2="365" y2="248" class="ar" marker-end="url(#ah)"/>
+
+<!-- ConstraintTokenEncoder branch -->
+<rect x="560" y="158" width="300" height="58" class="bk bn"/>
+<rect x="805" y="158" width="38" height="15" class="badge-bg"/>
+<text x="824" y="166" class="badge-tx">NEW</text>
+<text x="710" y="178" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">ConstraintTokenEncoder</text>
+<text x="710" y="196" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">type + line pair → h_c  (T_c × N × d)</text>
+<path d="M705,86 L705,130 L710,130" class="arn ard" fill="none"/>
+<line x1="710" y1="216" x2="710" y2="248" class="arn" marker-end="url(#ahr)"/>
+
+<!-- Concat + Segment -->
+<rect x="280" y="252" width="430" height="52" class="bk bm"/>
+<rect x="655" y="252" width="38" height="15" class="badge-bg"/>
+<text x="674" y="260" class="badge-tx">NEW</text>
+<text x="495" y="270" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Concat + SegmentEmbedding</text>
+<text x="495" y="288" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">E_joint = [E_cmd ; E_con] + seg(0|1)   长度 S + T_c</text>
+<path d="M365,248 L365,268 L400,268" class="ar" fill="none"/>
+<path d="M710,248 L710,268 L590,268" class="arn" fill="none"/>
+<line x1="495" y1="304" x2="495" y2="336" class="ar" marker-end="url(#ah)"/>
+
+<!-- Transformer Encoder -->
+<rect x="270" y="340" width="450" height="52" class="bk bo"/>
+<text x="495" y="358" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">JointTransformerEncoder（EncoderFused 内）×L</text>
+<text x="495" y="376" class="t tm to" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Self-Attn → FFN  作用于联合序列（命令 ⟷ 约束 双向交互）</text>
+<path d="M725,344 L733,344 L733,382 L725,382" class="brk"/>
+<text x="752" y="363" class="t tm td" style="font-size:11px;" text-anchor="middle" dominant-baseline="central">×L</text>
+<line x1="495" y1="392" x2="495" y2="424" class="ar" marker-end="url(#ah)"/>
+
+<!-- command_memory + batch 线掩码 → gather_line_features → ConstraintReconHead（与 Decoder 无数据依赖） -->
+<path d="M495,392 L495,548 L715,548 L715,652" class="arp ard" fill="none" opacity="0.8" marker-end="url(#ahp)"/>
+<text x="502" y="536" class="t tm td" style="font-size:9px;fill:var(--purple);" text-anchor="start" dominant-baseline="central">encoder command_memory</text>
+<text x="502" y="550" class="t tm td" style="font-size:8px;fill:var(--text-dim);" text-anchor="start" dominant-baseline="central">gather_line_features(·, line_cmd_mask, line_index_map)</text>
+
+<!-- Constraint-Aware Pooling -->
+<rect x="320" y="428" width="350" height="44" class="bk bn"/>
+<rect x="615" y="428" width="38" height="15" class="badge-bg"/>
+<text x="634" y="436" class="badge-tx">NEW</text>
+<text x="495" y="446" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Constraint-Aware Pooling</text>
+<text x="495" y="462" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">策略 A：全序列 masked mean（含约束 token）；Low Risk 继续复用</text>
+<line x1="495" y1="472" x2="495" y2="504" class="ar" marker-end="url(#ah)"/>
+
+<!-- Bottleneck -->
+<text x="225" y="518" class="t tm td" style="font-size:11px;letter-spacing:2px;">BOTTLENECK</text>
+<rect x="400" y="528" width="190" height="40" class="bk bo"/>
+<text x="495" y="542" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Bottleneck</text>
+<text x="495" y="558" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">BottleneckAdapter · Linear → Tanh · 与 DeepCAD 对齐</text>
+<line x1="495" y1="568" x2="495" y2="600" class="ar" marker-end="url(#ah)"/>
+
+<rect x="430" y="604" width="130" height="32" class="bk bp"/>
+<text x="495" y="620" class="t tp" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">z（约束感知）</text>
+
+<!-- z → Recon head (aux) -->
+<path d="M560,620 L900,620 L900,648" class="arn ard" marker-end="url(#ahr)"/>
+<rect x="720" y="652" width="240" height="56" class="bk bn"/>
+<rect x="905" y="652" width="38" height="15" class="badge-bg"/>
+<text x="924" y="660" class="badge-tx">NEW</text>
+<text x="840" y="672" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">ConstraintReconHead</text>
+<text x="840" y="692" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">forward(z, line_features)：unary_head(z)→unary_logits；pair_scorer(line_features,z) 或 pair_head(z)→pair_logits</text>
+<rect x="745" y="748" width="190" height="48" class="bk bgn" style="filter:none;stroke:var(--green);stroke-width:1.2;stroke-dasharray:4 3;"/>
+<text x="840" y="763" class="t tr" style="font-size:11px;font-weight:600;" text-anchor="middle" dominant-baseline="central">recon_loss（标量，图中记 L_constraint_recon）</text>
+<text x="840" y="778" class="t tm td" style="font-size:8px;" text-anchor="middle" dominant-baseline="central">= compose_recon_loss(unary_logits, pair_logits, unary_gt, pair_gt, line_mask, pos_weight)</text>
+<text x="840" y="790" class="t tm td" style="font-size:8px;" text-anchor="middle" dominant-baseline="central">与 ConstraintReconHead 分离：仅张量运算；line_mask 同 execute 内 build_line_mask</text>
+
+<!-- ========== DECODER ========== -->
+<text x="165" y="728" class="t tm tb" style="font-size:11px;letter-spacing:1.2px;">Generation Context</text>
+<text x="380" y="728" class="t tm td" style="font-size:11px;letter-spacing:2px;">Decoder</text>
+<rect x="160" y="738" width="700" height="418" class="gb gbo" style="stroke:rgba(78,148,230,.2)"/>
+
+<rect x="255" y="756" width="250" height="44" class="bk bo"/>
+<text x="380" y="772" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Const Embedding</text>
+<text x="380" y="790" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">位置编码（与 DeepCAD 一致）</text>
+<line x1="380" y1="800" x2="380" y2="832" class="ar" marker-end="url(#ah)"/>
+
+<!-- 每层重复：不含 constraint cross-attn（与 TransformerDecoderLayerGlobalImproved 一致） -->
+<rect x="190" y="836" width="640" height="176" class="gb gbo" style="stroke-dasharray:5 4;stroke:rgba(78,148,230,.22)"/>
+<text x="205" y="852" class="t tm tb" style="font-size:10px;" text-anchor="start" dominant-baseline="central">Decoder Layer ×N</text>
+<text x="815" y="926" class="t tm td" style="font-size:13px;" text-anchor="middle" dominant-baseline="central">×N</text>
+
+<rect x="270" y="860" width="220" height="36" class="sb sbo"/>
+<text x="380" y="874" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Self-Attention</text>
+<text x="380" y="888" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Pre-LN MHA + Residual</text>
+<line x1="380" y1="896" x2="380" y2="904" class="ar" marker-end="url(#ah)"/>
+
+<rect x="270" y="908" width="220" height="36" class="sb sbo"/>
+<text x="380" y="922" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Global z Injection</text>
+<text x="380" y="936" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">Linear(z) 广播相加 · memory=z</text>
+<path d="M495,620 L120,620 L120,922 L270,922" class="arp" marker-end="url(#ahp)"/>
+
+<line x1="380" y1="944" x2="380" y2="952" class="ar" marker-end="url(#ah)"/>
+
+<rect x="270" y="956" width="220" height="36" class="sb sbo"/>
+<text x="380" y="970" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Feed-Forward Network</text>
+<text x="380" y="984" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">LayerNorm → MLP → Residual（层内无 C cross-attn）</text>
+
+<!-- 与 ConstraintAwareDecoderAdapter 一致：全栈 Decoder 之后单次 -->
+<line x1="380" y1="992" x2="380" y2="1008" class="ar" marker-end="url(#ah)"/>
+
+<text x="205" y="1008" class="t tm tb" style="font-size:9px;" text-anchor="start" dominant-baseline="central">ConstraintAwareDecoderAdapter</text>
+<rect x="210" y="1014" width="340" height="62" class="sb sbd"/>
+<text x="380" y="1030" class="t tp" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">OptionalConstraintCrossAttn（×1）</text>
+<text x="380" y="1045" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">enable：MHA(Q=LayerNorm(hidden), K=V=LayerNorm(constraint_memory)) + 残差</text>
+<text x="380" y="1060" class="t tm td" style="font-size:8px;" text-anchor="middle" dominant-baseline="central">KV 来自 Joint Encoder×L 后的 memory 约束段 memory[s_cmd:]，非 ConstraintTokenEncoder 的 h_c 输入</text>
+<!-- KV：encoder_fused 返回的 constraint_memory；旧图误从 ConstraintTokenEncoder 顶部引线 -->
+<path d="M720,366 L930,366 L930,1045 L550,1045" class="arp ard" fill="none" opacity="0.72" marker-end="url(#ahp)"/>
+<text x="938" y="1034" class="t tm td" style="font-size:9px;fill:var(--purple);" text-anchor="start">constraint_memory</text>
+<text x="938" y="1046" class="t tm td" style="font-size:8px;fill:var(--text-dim);" text-anchor="start">= memory[s_cmd:]（Encoder 栈输出）</text>
+
+<line x1="380" y1="1076" x2="380" y2="1098" class="ar" marker-end="url(#ah)"/>
+
+<rect x="255" y="1102" width="250" height="40" class="bk bo"/>
+<text x="380" y="1118" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">FCN（Cmd + Arg）</text>
+<text x="380" y="1134" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">decoder_adapter：cross-attn 之后接 fcn（与 DeepCAD Decoder.fcn 一致）</text>
+
+<!-- ========== OUTPUT HEADS ========== -->
+<line x1="380" y1="1142" x2="380" y2="1178" class="ar" marker-end="url(#ah)"/>
+
+<text x="225" y="1188" class="t tm td" style="font-size:11px;letter-spacing:2px;">OUTPUT HEADS</text>
+
+<rect x="210" y="1200" width="280" height="52" class="bk bg"/>
+<text x="350" y="1218" class="t" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">Cmd Head + Arg Head</text>
+<text x="350" y="1238" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">FCN 输出 · 与 DeepCAD 一致</text>
+
+<rect x="530" y="1200" width="300" height="52" class="bk bgn"/>
+<rect x="775" y="1200" width="38" height="15" class="badge-bg"/>
+<text x="794" y="1208" class="badge-tx">NEW</text>
+<text x="680" y="1218" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">ConstraintPredHead（LINE-only）</text>
+<text x="680" y="1238" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">ConstraintPredHead(hidden_states)；hidden 与 FCN 输入相同（cross-attn 后）。输出 constraint_pred_logits → constraint_pred_loss（cfg 下 LINE-only 叠加 line_cmd_mask）</text>
+
+<path d="M405,1088 L680,1088 L680,1200" class="arn ard" marker-end="url(#ahr)"/>
+
+<line x1="350" y1="1252" x2="350" y2="1298" class="ar" marker-end="url(#ah)"/>
+<line x1="680" y1="1252" x2="680" y2="1298" class="arn" marker-end="url(#ahr)"/>
+
+<rect x="242" y="1302" width="216" height="34" class="bk bg" style="fill:rgba(72,199,116,.14);"/>
+<text x="350" y="1320" class="t tg" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">命令 / 参数 logits</text>
+
+<rect x="572" y="1302" width="216" height="34" class="bk bgn" style="filter:none;"/>
+<text x="680" y="1320" class="t tr" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">约束标签预测</text>
+
+<!-- ========== LOSS ========== -->
+<!-- 几何分支：与 train_use_case.execute 一致。旧图误将 ConstraintPredHead、L_recon 垂直连至本块。 -->
+
+<!-- Interpreter ← pred：args_logits -->
+<path d="M350,1336 L350,1358 L770,1358 L770,1378" class="arn ard" marker-end="url(#ahr)"/>
+<text x="558" y="1350" class="t tr" style="font-size:9px;font-weight:600;" text-anchor="middle" dominant-baseline="central">pred</text>
+<text x="558" y="1362" class="t tm td" style="font-size:8px;" text-anchor="middle" dominant-baseline="central">args_logits</text>
+
+<!-- Interpreter ← batch：线元数据（与 CAD 序列同源，非 Encoder 输出） -->
+<path d="M365,86 L365,1240 L248,1240 L248,1354 L612,1354 L612,1378" fill="none" stroke="var(--blue)" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.88" marker-end="url(#ah)"/>
+<text x="242" y="1226" class="t tb" style="font-size:9px;font-weight:600;" text-anchor="end" dominant-baseline="central">batch</text>
+<text x="242" y="1240" class="t tm td" style="font-size:8px;fill:var(--blue-light);" text-anchor="end" dominant-baseline="central">line_cmd_mask · line_index_map</text>
+
+<!-- Evaluator ← GT：unary_gt / pair_gt / line_mask（不经 UnaryRecon / pair_logits） -->
+<path d="M865,430 L865,1305 L702,1305 L702,1378" fill="none" stroke="var(--green)" stroke-width="1.65" stroke-dasharray="7 5" opacity="0.9" marker-end="url(#ahg)"/>
+<text x="872" y="1275" class="t tg" style="font-size:9px;font-weight:600;" text-anchor="start" dominant-baseline="central">GT → γ（geom_loss）</text>
+<text x="872" y="1289" class="t tm td" style="font-size:8px;fill:var(--green);" text-anchor="start" dominant-baseline="central">unary_gt · pair_gt · line_mask（与 β 同源 build_line_mask）</text>
+
+<rect x="600" y="1378" width="340" height="56" class="bk bn" style="filter:none;"/>
+<rect x="885" y="1378" width="38" height="15" class="badge-bg"/>
+<text x="904" y="1386" class="badge-tx">NEW</text>
+<text x="770" y="1393" class="t tr" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">DifferentiableSketchInterpreter + DifferentiableConstraintEvaluator</text>
+<text x="770" y="1409" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">DifferentiableSketchInterpreter(arg_logits, line_cmd_mask, line_index_map, max_lines) → soft_lines</text>
+<text x="770" y="1423" class="t tm td" style="font-size:9px;" text-anchor="middle" dominant-baseline="central">DifferentiableConstraintEvaluator(soft_lines, unary_gt, pair_gt, line_mask) → geom_loss；不消费 recon 的 logits</text>
+
+<text x="225" y="1365" class="t tm to" style="font-size:11px;letter-spacing:1.2px;">Training Orchestration · LossComposer</text>
+
+<rect x="80" y="1440" width="180" height="44" class="bk bl"/>
+<text x="170" y="1456" class="t to" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">L_cmd</text>
+<text x="170" y="1474" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">命令交叉熵</text>
+
+<rect x="290" y="1440" width="180" height="44" class="bk bln"/>
+<rect x="415" y="1440" width="38" height="15" class="badge-bg"/>
+<text x="434" y="1448" class="badge-tx">NEW</text>
+<text x="380" y="1456" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">α · pred_loss</text>
+<text x="380" y="1474" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">LINE-only BCE · 聚焦真实 line token</text>
+
+<rect x="500" y="1440" width="180" height="44" class="bk bln"/>
+<rect x="625" y="1440" width="38" height="15" class="badge-bg"/>
+<text x="644" y="1448" class="badge-tx">NEW</text>
+<text x="590" y="1456" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">β · recon_loss</text>
+<text x="590" y="1474" class="t tm td" style="font-size:8px;" text-anchor="middle" dominant-baseline="central">pred：unary_logits/pair_logits ← recon_head(z, gather_line_features(command_memory, …, max_lines))；GT：unary_gt, pair_gt, line_mask</text>
+
+<rect x="710" y="1440" width="180" height="44" class="bk bln"/>
+<rect x="835" y="1440" width="38" height="15" class="badge-bg"/>
+<text x="854" y="1448" class="badge-tx">NEW</text>
+<text x="800" y="1456" class="t tr" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">γ · geom_loss</text>
+<text x="800" y="1474" class="t tm td" style="font-size:8px;" text-anchor="middle" dominant-baseline="central">输入：soft_lines + unary_gt + pair_gt + line_mask（代码名 geom_loss）</text>
+
+<path d="M350,1336 L350,1410 L170,1410 L170,1440" class="ar" marker-end="url(#ah)"/>
+<path d="M680,1336 L680,1410 L380,1410 L380,1440" class="arn" marker-end="url(#ahr)"/>
+<!-- unary_logits / pair_logits：自 ConstraintReconHead → compose_recon_loss（不经 recon_loss 装饰框） -->
+<path d="M840,708 L840,1395 L590,1395 L590,1440" class="arn ard" marker-end="url(#ahr)"/>
+<text x="848" y="1336" class="t tr" style="font-size:9px;font-weight:600;" text-anchor="start" dominant-baseline="central">pred → β</text>
+<text x="848" y="1350" class="t tm td" style="font-size:8px;" text-anchor="start" dominant-baseline="central">unary_logits · pair_logits</text>
+<line x1="770" y1="1432" x2="800" y2="1440" class="arn" marker-end="url(#ahr)"/>
+
+<line x1="170" y1="1484" x2="170" y2="1538" class="ar" marker-end="url(#ah)"/>
+<line x1="380" y1="1484" x2="380" y2="1538" class="arn" marker-end="url(#ahr)"/>
+<line x1="590" y1="1484" x2="590" y2="1538" class="arn" marker-end="url(#ahr)"/>
+<line x1="800" y1="1484" x2="800" y2="1538" class="arn" marker-end="url(#ahr)"/>
+
+<text x="275" y="1528" class="t" style="font-size:16px;fill:var(--text-dim);" text-anchor="middle" dominant-baseline="central">+</text>
+<text x="485" y="1528" class="t" style="font-size:16px;fill:var(--text-dim);" text-anchor="middle" dominant-baseline="central">+</text>
+<text x="695" y="1528" class="t" style="font-size:16px;fill:var(--text-dim);" text-anchor="middle" dominant-baseline="central">+</text>
+
+<rect x="125" y="1545" width="750" height="52" class="bk" style="fill:rgba(237,169,78,.1);stroke:var(--orange);stroke-width:2.5;"/>
+<text x="500" y="1564" class="t" style="font-size:14px;font-weight:700;" text-anchor="middle" dominant-baseline="central">L_total = L_cmd + α·pred_loss + β·recon_loss + γ·geom_loss</text>
+<text x="500" y="1584" class="t tm to" style="font-size:11px;" text-anchor="middle" dominant-baseline="central">Low Risk 不改总损失结构，优先修信息通路与监督对齐；评估仍用统一 summary.json 口径</text>
+
+<!-- Inference note -->
+<line x1="500" y1="1597" x2="500" y2="1638" class="ar" marker-end="url(#ah)"/>
+<text x="225" y="1600" class="t tm td" style="font-size:11px;letter-spacing:2px;">INFERENCE（Latent GAN）</text>
+<rect x="250" y="1612" width="560" height="48" class="bk bp" style="stroke:rgba(160,125,232,.5);"/>
+<text x="530" y="1630" class="t tp" style="font-size:13px;font-weight:600;" text-anchor="middle" dominant-baseline="central">GenerateFromLatentUseCase：z（Encoder 或 LatentGAN）→ Decoder → CAD</text>
+<text x="530" y="1648" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">训练期可直读 constraint memory；推理期仍兼容 latent-only 路径，不强制外部 C</text>
+
+<!-- Evaluation -->
+<line x1="500" y1="1660" x2="500" y2="1705" class="ar" marker-end="url(#ah)"/>
+<text x="225" y="1715" class="t tm td" style="font-size:11px;letter-spacing:2px;">EVALUATION（EvaluateConstraintSatisfactionUseCase）</text>
+<rect x="230" y="1728" width="240" height="48" class="bk bo"/>
+<text x="350" y="1746" class="t" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">几何指标</text>
+<text x="350" y="1764" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">重建 / 几何合法性</text>
+<rect x="520" y="1728" width="300" height="48" class="bk bn"/>
+<rect x="765" y="1728" width="38" height="15" class="badge-bg"/>
+<text x="784" y="1736" class="badge-tx">NEW</text>
+<text x="670" y="1746" class="t tr" style="font-size:12px;font-weight:600;" text-anchor="middle" dominant-baseline="central">统一约束指标</text>
+<text x="670" y="1764" class="t tm td" style="font-size:10px;" text-anchor="middle" dominant-baseline="central">ratio_h / ratio_v / // recall / ⟂ recall</text>
+
+<!-- Summary -->
+<rect x="115" y="1795" width="830" height="198" rx="8" ry="8" fill="rgba(255,255,255,.02)" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+<text x="530" y="1820" class="t" style="font-size:13px;font-weight:700;fill:var(--text-dim);" text-anchor="middle" dominant-baseline="central">DDD 视角：相对当前 Modify2 基线的 Low Risk 核心差异</text>
+
+<text x="140" y="1848" class="t tm tr" style="font-size:11px;" dominant-baseline="central">①</text>
+<text x="158" y="1848" class="t" style="font-size:12px;fill:var(--red-light);" dominant-baseline="central">保留 Modify2 四类约束数据契约、联合编码、重建与评估闭环，不改 extractor / reconstruction / summary 口径</text>
+
+<text x="140" y="1872" class="t tm tr" style="font-size:11px;" dominant-baseline="central">②</text>
+<text x="158" y="1872" class="t tm" style="font-size:12px;fill:var(--red-light);" dominant-baseline="central">decoder 经 OptionalConstraintCrossAttn 在 TransformerDecoder 全栈之后单次消费 constraint_memory；推理仍可关闭以保持 latent-only</text>
+
+<text x="140" y="1896" class="t tm tr" style="font-size:11px;" dominant-baseline="central">③</text>
+<text x="158" y="1896" class="t" style="font-size:12px;fill:var(--red-light);" dominant-baseline="central">pair recon 从 z-only MLP 升级为 line-level pair scorer，用线特征建模 Parallel / Perpendicular</text>
+
+<text x="140" y="1920" class="t tm tr" style="font-size:11px;" dominant-baseline="central">④</text>
+<text x="158" y="1920" class="t" style="font-size:12px;fill:var(--red-light);" dominant-baseline="central">ConstraintPredHead 继续保留，但 pred_loss 只在线命令位置计算，减少非线位置零标签稀释</text>
+
+<text x="140" y="1944" class="t tm tr" style="font-size:11px;" dominant-baseline="central">⑤</text>
+<text x="158" y="1944" class="t" style="font-size:12px;fill:var(--orange);" dominant-baseline="central">总损失与代码一致：L_cmd + α·pred_loss + β·recon_loss + γ·geom_loss（论文记号可对应 L_constraint_pred / L_constraint_recon / L_geom）</text>
+
+<text x="140" y="1968" class="t tm tr" style="font-size:11px;" dominant-baseline="central">⑥</text>
+<text x="158" y="1968" class="t" style="font-size:12px;fill:var(--purple);" dominant-baseline="central">仍保持低风险可回退：推理期可关闭 cross-attn，继续兼容 latent-only inference 与现有包边界</text>
+
+<text x="140" y="1992" class="t tm tb" style="font-size:11px;" dominant-baseline="central">★</text>
+<text x="158" y="1992" class="t" style="font-size:12px;fill:var(--blue-light);" dominant-baseline="central">若实施后 pair 指标仍无明显改善，则可更明确地判断需要进入更高风险的结构重写阶段</text>
+
+</svg>
+
+  <div class="panel">
+    <h2>限界上下文与典型模块（文档 §2.1）</h2>
+    <div class="panel-grid">
+      <table class="kv">
+        <tr><th>Sketch Preparation</th><td>继续输出 <code>constraint_tags</code>、<code>constraint_tokens</code>、<code>unary_gt</code>、<code>pair_gt</code>、<code>line_cmd_mask</code>、<code>line_index_map</code>；Low Risk 不修改四类约束的数据契约。</td></tr>
+        <tr><th>Constraint-Fused Encoding</th><td>继续使用 <code>CADEmbeddingFused</code>、<code>ConstraintTokenEncoder</code>、<code>EncoderFused</code>、<code>Pooling</code>、<code>Bottleneck</code>；增量目标是让 encoder 输出更好地服务 decoder 与 pair scorer。</td></tr>
+        <tr><th>Generation</th><td>主要改动集中在 <code>decoder_adapter.py</code> 与 <code>recon_head.py</code>：<code>OptionalConstraintCrossAttn</code> 在 <code>TransformerDecoder</code> <b>全栈之后 ×1</b>（非每层）；pair 重建从 <code>z-only</code> 升级为 <code>line-level pair scorer</code>。</td></tr>
+        <tr><th>Training Orchestration</th><td><code>train_use_case.execute</code>：<code>line_mask = build_line_mask(line_count, unary_logits.size(1))</code>。<code>loss_composer.LossComposer.compose</code> 调用 <code>compose_recon_loss(unary_logits, pair_logits, unary_gt, pair_gt, line_mask, pos_weight)</code> 得到 <code>recon_loss</code>；logits 来自 <code>recon_head(z, line_features)</code>，<code>line_features = gather_line_features(encoder_outputs[&quot;command_memory&quot;], line_cmd_mask, line_index_map, max_lines=cfg.max_lines)</code>。<code>geom_loss, _ = constraint_evaluator(soft_lines, unary_gt, pair_gt, line_mask=line_mask)</code>，<code>soft_lines = interpreter(decoder_output[&quot;args_logits&quot;], line_cmd_mask, line_index_map, max_lines=unary_logits.size(1))</code>。<code>constraint_pred_loss</code> 为 LINE-only。几何支路<b>不</b>使用 recon 的 logits。</td></tr>
+      </table>
+      <table class="kv">
+        <tr><th>领域聚合根</th><td><code>SketchSequenceAggregate</code> 保持不变：commands、constraints、constraint_tags、constraint_tokens、unary_gt、pair_gt 一致持有。Low Risk 不改输入输出形状。</td></tr>
+        <tr><th>领域服务</th><td><code>ConstraintFusionDomainService</code> 继续负责 encoder + bottleneck → z；新增重点是让 decoder 与 recon head 更直接消费 encoder memory，而不是只依赖 pooled <code>z</code>。</td></tr>
+        <tr><th>Low Risk 三项优先改造</th><td><code>OptionalConstraintCrossAttn</code>（代码类名；层外单次 MHA）、<code>LinePairReconScorer</code>、<code>LINE-only constraint_pred_loss</code>。三者分别解决通路弱、pair 建模弱、监督稀释三类问题。</td></tr>
+        <tr><th>独立实现</th><td>代码落在 <code>constraint_fused_deepcad_simplify_modify2_low_risk/</code>；Low Risk 定位为对 Modify2 的增量增强方案。</td></tr>
+      </table>
+    </div>
+    <p class="doc-ref">技术事实来源：<a href="./Constraint-Fused%20DeepCAD%20Simplify%20Modify2%20Low%20Risk%20DDD技术方案.md">Constraint-Fused DeepCAD Simplify Modify2 Low Risk DDD技术方案.md</a>。解码器主图与 <code>constraint_fused_deepcad_simplify_modify2_low_risk/generation/decoder_adapter.py</code>、<code>model/layers/improved_transformer.py</code> 中 <code>TransformerDecoderLayerGlobalImproved</code> 一致：<b>约束 cross-attn 不在每层循环内</b>，而是在整段 <code>TransformerDecoder</code> 输出之上执行一次。</p>
+  </div>
+</div>
+</body>
+</html>

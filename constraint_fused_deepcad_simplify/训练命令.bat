@@ -1,0 +1,1 @@
+python -m constraint_fused_deepcad_simplify.train --data_root data --proj_dir proj_log/constraint_fused_deepcad_simplify --exp_name cf_simplify -g 0 --num_workers 0 --batch_size 256 --nr_epochs 10

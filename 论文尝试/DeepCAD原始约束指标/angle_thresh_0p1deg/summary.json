@@ -1,0 +1,17 @@
+{
+  "n_samples": 8052,
+  "sum_gt_h": 25291,
+  "sum_pred_h": 23708,
+  "sum_gt_v": 23921,
+  "sum_pred_v": 22298,
+  "angle_thresh_deg": 0.1,
+  "grid_size": 256,
+  "n_parse_fail_gt": 0,
+  "n_parse_fail_pred": 74,
+  "ratio_h": 0.9374085643114152,
+  "ratio_v": 0.932151665900255,
+  "checkpoint_path": "D:\\DeepCAD\\DeepCAD\\proj_log\\newDeepCAD\\model\\latest.pth",
+  "data_root": "D:\\DeepCAD\\DeepCAD\\data",
+  "exp_name": "newDeepCAD",
+  "proj_dir": "D:\\DeepCAD\\DeepCAD\\proj_log"
+}

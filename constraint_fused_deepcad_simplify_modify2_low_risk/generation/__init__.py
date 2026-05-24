@@ -1,0 +1,1 @@
+from .decoder_adapter import ConstraintAwareDecoderAdapter

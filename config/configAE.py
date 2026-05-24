@@ -100,6 +100,7 @@ class ConfigAE(object):
             parser.add_argument('-m', '--mode', type=str, choices=['rec', 'enc', 'dec'])
             parser.add_argument('-o', '--outputs', type=str, default=None)
             parser.add_argument('--z_path', type=str, default=None)
+            parser.add_argument('--eval_split', type=str, default='test')
         
         args = parser.parse_args()
         return parser, args

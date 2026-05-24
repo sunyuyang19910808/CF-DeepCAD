@@ -1,0 +1,33 @@
+{
+  "summary_path": "D:\\DeepCAD\\DeepCAD\\constraint_fused_deepcad_simplify_modify2\\summary.json",
+  "metrics_csv_path": "D:\\DeepCAD\\DeepCAD\\proj_log\\constraint_fused_deepcad_simplify_modify2\\cf_simplify_modify2\\artifacts\\train_metrics.csv",
+  "ratio_h": 0.9435767664386541,
+  "ratio_v": 0.9428117553613979,
+  "parallel_recall_index_aligned": 0.8234494905019499,
+  "perpendicular_recall_index_aligned": 0.914551342316933,
+  "n_parse_fail_pred": 62,
+  "n_samples_extrude_count_mismatch": 129,
+  "train_window_mean": {
+    "pred_loss": 2.5390294361114503,
+    "recon_loss": 1.3116901159286498,
+    "unary_recon_loss": 0.6338188529014588,
+    "pair_recon_loss": 0.6778712630271911
+  },
+  "train_last_row": {
+    "epoch": "83",
+    "step": "210180",
+    "loss": "1.417505145072937",
+    "loss_cmd": "0.4913478493690491",
+    "loss_cmd_only": "0.022106552496552467",
+    "loss_args": "0.46924129128456116",
+    "pred_loss": "2.563086986541748",
+    "recon_loss": "1.307171106338501",
+    "unary_recon_loss": "0.6318587064743042",
+    "pair_recon_loss": "0.6753123998641968",
+    "geom_loss": "0.08131476491689682",
+    "geom_horizontal": "0.03675886243581772",
+    "geom_vertical": "0.014878100715577602",
+    "geom_parallel": "0.043480806052684784",
+    "geom_perpendicular": "0.12737628817558289"
+  }
+}

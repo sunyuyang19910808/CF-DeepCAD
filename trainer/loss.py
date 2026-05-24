@@ -26,8 +26,21 @@ class CADLoss(nn.Module):
 
         mask = self.cmd_args_mask[tgt_commands.long()]
 
-        loss_cmd = F.cross_entropy(command_logits[padding_mask.bool()].reshape(-1, self.n_commands), tgt_commands[padding_mask.bool()].reshape(-1).long())
-        loss_args = F.cross_entropy(args_logits[mask.bool()].reshape(-1, self.args_dim), tgt_args[mask.bool()].reshape(-1).long() + 1)  # shift due to -1 PAD_VAL
+        command_logits_masked = command_logits[padding_mask.bool()];
+        command_logits_masked_reshape = command_logits_masked.reshape(-1, self.n_commands);
+        tgt_commands_masked = tgt_commands[padding_mask.bool()];
+        tgt_commands_masked_reshape = tgt_commands_masked.reshape(-1).long();
+        loss_cmd = F.cross_entropy(command_logits_masked_reshape, tgt_commands_masked_reshape);
+
+        #loss_cmd = F.cross_entropy(command_logits[padding_mask.bool()].reshape(-1, self.n_commands), tgt_commands[padding_mask.bool()].reshape(-1).long())
+
+
+        args_logits_masked = args_logits[mask.bool()];
+        args_logits_masked_reshape = args_logits_masked.reshape(-1, self.args_dim);
+        tgt_args_masked = tgt_args[mask.bool()];
+        tgt_args_masked_reshape = tgt_args_masked.reshape(-1).long() + 1;
+        loss_args = F.cross_entropy(args_logits_masked_reshape, tgt_args_masked_reshape);
+        #loss_args = F.cross_entropy(args_logits[mask.bool()].reshape(-1, self.args_dim), tgt_args[mask.bool()].reshape(-1).long() + 1)  # shift due to -1 PAD_VAL
 
         loss_cmd = self.weights["loss_cmd_weight"] * loss_cmd
         loss_args = self.weights["loss_args_weight"] * loss_args

@@ -1,0 +1,1 @@
+python -m constraint_fused_deepcad_simplify_modify1.reconstruct --model_path "proj_log/constraint_fused_deepcad_simplify_modify1/cf_simplify_modify1/model/latest.pth" --data_root "data"

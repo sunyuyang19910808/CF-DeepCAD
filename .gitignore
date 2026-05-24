@@ -1,0 +1,10 @@
+/data
+
+# Offline constraint extraction dumps (large JSON trees)
+constraint_fused_deepcad/sketch_preparation/ExtractData/
+constraint_fused_deepcad_simplify/reconstruction/
+constraint_fused_deepcad_simplify_modify1/reconstruction/
+论文尝试/DeepCAD原始约束指标/reconstruction/
+*.pyc
+*.h5
+

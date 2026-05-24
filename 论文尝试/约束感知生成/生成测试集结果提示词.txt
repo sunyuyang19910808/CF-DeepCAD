@@ -1,0 +1,10 @@
+1、模型：constraint_fused_deepcad_simplify_modify2方案训练出的模型  @proj_log/constraint_fused_deepcad_simplify_modify2/cf_simplify_modify2/model/ckpt_epoch80.pth  ，对测试集做 重建（rec）。
+2、输入数据：{data_root}/train_val_test_split.json 中的 test 列表；向量来自 {data_root}/cad_vec/{id}.h5 的 vec。
+
+我的需求：
+推理对齐：与项目 @test.py 的 rec 模式一致 — 按 GT 序列中首个 EOS 截断，保存至   @constraint_fused_deepcad_simplify_modify2   文件夹中  reconstruction/*_vec.h5。 
+
+请帮我实现，有任何问题请咨询我
+
+
+帮我参考@论文尝试/DeepCAD原始约束指标/评估口径说明.md 中的计算方式，我想评估Constraint-Fused DeepCAD Simplify Modify2方案的约束相关指标。帮我基于@constraint_fused_deepcad_simplify_modify2/reconstruction   输出per_sample_counts.csv、summary.json在@constraint_fused_deepcad_simplify_modify2 文件夹中

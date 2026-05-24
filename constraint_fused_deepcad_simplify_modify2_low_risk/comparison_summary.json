@@ -1,0 +1,68 @@
+{
+  "baselines": {
+    "modify2": {
+      "ratio_h": 0.9435767664386541,
+      "ratio_v": 0.9428117553613979,
+      "parallel_recall_index_aligned": 0.8234494905019499,
+      "perpendicular_recall_index_aligned": 0.914551342316933,
+      "n_parse_fail_pred": 62,
+      "n_samples_extrude_count_mismatch": 129,
+      "train_window_mean": {
+        "pred_loss": 2.5390294361114503,
+        "recon_loss": 1.3116901159286498,
+        "unary_recon_loss": 0.6338188529014588,
+        "pair_recon_loss": 0.6778712630271911
+      }
+    },
+    "simplify": {
+      "ratio_h": 0.9446048001265273,
+      "ratio_v": 0.93967643493165,
+      "parallel_recall_index_aligned": 0.8276212677313759,
+      "perpendicular_recall_index_aligned": 0.9218736600174948,
+      "n_parse_fail_pred": 69,
+      "n_samples_extrude_count_mismatch": 106
+    },
+    "original_deepcad": {
+      "ratio_h": 0.9374085643114152,
+      "ratio_v": 0.932151665900255,
+      "parallel_recall_index_aligned": 0.8003656216803775,
+      "perpendicular_recall_index_aligned": 0.9109838090010977,
+      "n_parse_fail_pred": 74,
+      "n_samples_extrude_count_mismatch": 74
+    },
+    "low_risk": {
+      "ratio_h": 0.0,
+      "ratio_v": 0.0,
+      "parallel_recall_index_aligned": null,
+      "perpendicular_recall_index_aligned": null,
+      "n_parse_fail_pred": 0,
+      "n_samples_extrude_count_mismatch": 8
+    }
+  },
+  "delta_low_risk_minus": {
+    "modify2": {
+      "ratio_h": -0.9435767664386541,
+      "ratio_v": -0.9428117553613979,
+      "parallel_recall_index_aligned": null,
+      "perpendicular_recall_index_aligned": null,
+      "n_parse_fail_pred": -62,
+      "n_samples_extrude_count_mismatch": -121
+    },
+    "simplify": {
+      "ratio_h": -0.9446048001265273,
+      "ratio_v": -0.93967643493165,
+      "parallel_recall_index_aligned": null,
+      "perpendicular_recall_index_aligned": null,
+      "n_parse_fail_pred": -69,
+      "n_samples_extrude_count_mismatch": -98
+    },
+    "original_deepcad": {
+      "ratio_h": -0.9374085643114152,
+      "ratio_v": -0.932151665900255,
+      "parallel_recall_index_aligned": null,
+      "perpendicular_recall_index_aligned": null,
+      "n_parse_fail_pred": -74,
+      "n_samples_extrude_count_mismatch": -66
+    }
+  }
+}

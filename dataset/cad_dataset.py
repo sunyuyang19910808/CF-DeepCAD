@@ -4,6 +4,8 @@ import os
 import json
 import h5py
 import random
+import warnings
+import numpy as np
 from cadlib.macro import *
 
 
@@ -30,16 +32,49 @@ class CADDataset(Dataset):
         self.max_n_curves = config.max_n_curves            # Number of commands (N_C)
         self.max_total_len = config.max_total_len
         self.size = 256
+        self._warned_bad_samples = set()
 
     def get_data_by_id(self, data_id):
         idx = self.all_data.index(data_id)
         return self.__getitem__(idx)
 
+    def _load_cad_vec(self, index):
+        last_error = None
+        total = len(self.all_data)
+        for offset in range(total):
+            candidate_index = (index + offset) % total
+            data_id = self.all_data[candidate_index]
+            h5_path = os.path.join(self.raw_data, data_id + ".h5")
+            try:
+                with h5py.File(h5_path, "r") as fp:
+                    cad_vec = fp["vec"][:] # (len, 1 + N_ARGS)
+                if cad_vec.shape[0] > self.max_total_len:
+                    raise ValueError(
+                        "cad_vec length {} exceeds max_total_len {}.".format(
+                            cad_vec.shape[0], self.max_total_len
+                        )
+                    )
+                if offset > 0:
+                    warnings.warn(
+                        "Sample {} is unavailable; falling back to {}.".format(
+                            self.all_data[index], data_id
+                        ),
+                        RuntimeWarning,
+                    )
+                return data_id, cad_vec
+            except (OSError, FileNotFoundError, KeyError, ValueError) as exc:
+                last_error = exc
+                if data_id not in self._warned_bad_samples:
+                    warnings.warn(
+                        "Skipping invalid cad_vec sample {}: {}".format(data_id, exc),
+                        RuntimeWarning,
+                    )
+                    self._warned_bad_samples.add(data_id)
+                continue
+        raise RuntimeError("No valid cad_vec samples could be loaded for phase {}.".format(self.phase)) from last_error
+
     def __getitem__(self, index):
-        data_id = self.all_data[index]
-        h5_path = os.path.join(self.raw_data, data_id + ".h5")
-        with h5py.File(h5_path, "r") as fp:
-            cad_vec = fp["vec"][:] # (len, 1 + N_ARGS)
+        data_id, cad_vec = self._load_cad_vec(index)
 
         if self.aug and self.phase == "train":
             command1 = cad_vec[:, 0]

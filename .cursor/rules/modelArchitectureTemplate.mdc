@@ -1,0 +1,10 @@
+---
+description: 
+alwaysApply: false
+---
+
+# 模型架构图规范
+
+1、使用html格式
+2、绘制模型结构图时，应包含KEY PARAMS、DATA SHAPES
+3、样式与模板model_architecture_template.html一致

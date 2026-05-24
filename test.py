@@ -33,11 +33,12 @@ def reconstruct(cfg):
     tr_agent.net.eval()
 
     # create dataloader
-    test_loader = get_dataloader('test', cfg)
-    print("Total number of test data:", len(test_loader))
+    eval_split = getattr(cfg, 'eval_split', 'test')
+    test_loader = get_dataloader(eval_split, cfg)
+    print("Total number of {} data:".format(eval_split), len(test_loader))
 
     if cfg.outputs is None:
-        cfg.outputs = "{}/results/test_{}".format(cfg.exp_dir, cfg.ckpt)
+        cfg.outputs = "{}/results/{}_{}".format(cfg.exp_dir, eval_split, cfg.ckpt)
     ensure_dir(cfg.outputs)
 
     # evaluate
@@ -60,8 +61,8 @@ def reconstruct(cfg):
 
             save_path = os.path.join(cfg.outputs, '{}_vec.h5'.format(data_id))
             with h5py.File(save_path, 'w') as fp:
-                fp.create_dataset('out_vec', data=out_vec[:seq_len], dtype=np.int)
-                fp.create_dataset('gt_vec', data=gt_vec[j][:seq_len], dtype=np.int)
+                fp.create_dataset('out_vec', data=out_vec[:seq_len], dtype=int)
+                fp.create_dataset('gt_vec', data=gt_vec[j][:seq_len], dtype=int)
 
 
 def encode(cfg):
@@ -123,7 +124,7 @@ def decode(cfg):
 
             save_path = os.path.join(save_dir, '{}.h5'.format(i + j))
             with h5py.File(save_path, 'w') as fp:
-                fp.create_dataset('out_vec', data=out_vec[:seq_len], dtype=np.int)
+                fp.create_dataset('out_vec', data=out_vec[:seq_len], dtype=int)
 
 
 if __name__ == '__main__':

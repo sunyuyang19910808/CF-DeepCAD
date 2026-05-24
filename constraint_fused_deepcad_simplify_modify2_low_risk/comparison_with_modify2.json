@@ -1,0 +1,32 @@
+{
+  "modify2_baseline": {
+    "ratio_h": 0.9435767664386541,
+    "ratio_v": 0.9428117553613979,
+    "parallel_recall_index_aligned": 0.8234494905019499,
+    "perpendicular_recall_index_aligned": 0.914551342316933,
+    "n_parse_fail_pred": 62,
+    "n_samples_extrude_count_mismatch": 129,
+    "train_window_mean": {
+      "pred_loss": 2.5390294361114503,
+      "recon_loss": 1.3116901159286498,
+      "unary_recon_loss": 0.6338188529014588,
+      "pair_recon_loss": 0.6778712630271911
+    }
+  },
+  "low_risk": {
+    "ratio_h": 0.0,
+    "ratio_v": 0.0,
+    "parallel_recall_index_aligned": null,
+    "perpendicular_recall_index_aligned": null,
+    "n_parse_fail_pred": 0,
+    "n_samples_extrude_count_mismatch": 8
+  },
+  "delta_low_risk_minus_modify2": {
+    "ratio_h": -0.9435767664386541,
+    "ratio_v": -0.9428117553613979,
+    "parallel_recall_index_aligned": null,
+    "perpendicular_recall_index_aligned": null,
+    "n_parse_fail_pred": -62,
+    "n_samples_extrude_count_mismatch": -121
+  }
+}

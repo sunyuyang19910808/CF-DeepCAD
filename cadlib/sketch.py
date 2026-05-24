@@ -1,7 +1,9 @@
+import os
+
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
+
+matplotlib.use(os.environ.get("MPLBACKEND", "TkAgg"))
 from .curves import *
 from .macro import *
 
@@ -101,6 +103,8 @@ class SketchBase(object):
 
     def to_image(self):
         """convert to image"""
+        import matplotlib.pyplot as plt
+
         fig, ax = plt.subplots()
         self.draw(ax)
         ax.axis('equal')

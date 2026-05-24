@@ -1,6 +1,4 @@
 import numpy as np
-import matplotlib.lines as lines
-import matplotlib.patches as patches
 from .math_utils import rads_to_degs, angle_from_vector_to_x
 from .macro import *
 
@@ -136,14 +134,16 @@ class Line(CurveBase):
         self.start_point, self.end_point = self.end_point, self.start_point
 
     def numericalize(self, n=256):
-        self.start_point = self.start_point.round().clip(min=0, max=n-1).astype(np.int)
-        self.end_point = self.end_point.round().clip(min=0, max=n-1).astype(np.int)
+        self.start_point = self.start_point.round().clip(min=0, max=n-1).astype(int)
+        self.end_point = self.end_point.round().clip(min=0, max=n-1).astype(int)
 
     def to_vector(self):
         vec = [LINE_IDX, self.end_point[0], self.end_point[1]]
         return np.array(vec + [PAD_VAL] * (1 + N_ARGS - len(vec)))
 
     def draw(self, ax, color):
+        import matplotlib.lines as lines
+
         xdata = [self.start_point[0], self.end_point[0]]
         ydata = [self.start_point[1], self.end_point[1]]
         l1 = lines.Line2D(xdata, ydata, lw=1, color=color, axes=ax)
@@ -293,13 +293,13 @@ class Arc(CurveBase):
         self.start_point, self.end_point = self.end_point, self.start_point
 
     def numericalize(self, n=256):
-        self.start_point = self.start_point.round().clip(min=0, max=n-1).astype(np.int)
-        self.mid_point = self.mid_point.round().clip(min=0, max=n-1).astype(np.int)
-        self.end_point = self.end_point.round().clip(min=0, max=n-1).astype(np.int)
-        self.center = self.center.round().clip(min=0, max=n-1).astype(np.int)
+        self.start_point = self.start_point.round().clip(min=0, max=n-1).astype(int)
+        self.mid_point = self.mid_point.round().clip(min=0, max=n-1).astype(int)
+        self.end_point = self.end_point.round().clip(min=0, max=n-1).astype(int)
+        self.center = self.center.round().clip(min=0, max=n-1).astype(int)
         tmp = np.array([self.start_angle, self.end_angle])
         self.start_angle, self.end_angle = (tmp / (2 * np.pi) * n).round().clip(
-                                            min=0, max=n-1).astype(np.int)
+                                            min=0, max=n-1).astype(int)
 
     def to_vector(self):
         sweep_angle = max(abs(self.start_angle - self.end_angle), 1)
@@ -307,6 +307,8 @@ class Arc(CurveBase):
                          *[PAD_VAL] * N_ARGS_EXT])
 
     def draw(self, ax, color):
+        import matplotlib.patches as patches
+
         ref_vec_angle = rads_to_degs(angle_from_vector_to_x(self.ref_vec))
         start_angle = rads_to_degs(self.start_angle)
         end_angle = rads_to_degs(self.end_angle)
@@ -400,14 +402,16 @@ class Circle(CurveBase):
         pass
 
     def numericalize(self, n=256):
-        self.center = self.center.round().clip(min=0, max=n-1).astype(np.int)
-        self.radius = np.round(self.radius).clip(min=1, max=n-1).astype(np.int)
+        self.center = self.center.round().clip(min=0, max=n-1).astype(int)
+        self.radius = np.round(self.radius).clip(min=1, max=n-1).astype(int)
 
     def to_vector(self):
         vec = [CIRCLE_IDX, self.center[0], self.center[1], PAD_VAL, PAD_VAL, self.radius]
         return np.array(vec + [PAD_VAL] * (1 + N_ARGS - len(vec)))
 
     def draw(self, ax, color):
+        import matplotlib.patches as patches
+
         ap = patches.Circle((self.center[0], self.center[1]), self.radius,
                             lw=1, fill=None, color=color)
         ax.add_patch(ap)
