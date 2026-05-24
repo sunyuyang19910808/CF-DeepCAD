@@ -159,6 +159,17 @@ def main() -> None:
                 aux_beta=float(out["aux_beta"]),
                 aux_gamma=float(out["aux_gamma"]),
             )
+            if getattr(cfg, "use_hard_geom_bce", False) or getattr(cfg, "use_corrected_line_start", False):
+                metrics.update(
+                    geom_h_loss=float(out["geom_h_loss"].item()),
+                    geom_v_loss=float(out["geom_v_loss"].item()),
+                    geom_para_loss=float(out["geom_para_loss"].item()),
+                    geom_perp_loss=float(out["geom_perp_loss"].item()),
+                    aux_gamma_h=float(out["aux_gamma_h"]),
+                    aux_gamma_v=float(out["aux_gamma_v"]),
+                    aux_gamma_para=float(out["aux_gamma_para"]),
+                    aux_gamma_perp=float(out["aux_gamma_perp"]),
+                )
             pbar.set_description("EPOCH[{}][{}]".format(epoch, batch_idx))
             pbar.set_postfix(metrics)
 

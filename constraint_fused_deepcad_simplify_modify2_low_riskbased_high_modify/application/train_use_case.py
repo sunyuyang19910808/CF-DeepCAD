@@ -17,6 +17,9 @@ from constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify.applica
     LossComposer,
     constraint_pred_loss,
 )
+from constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify.application.loss_schedule import (
+    resolve_aux_weights,
+)
 from constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify.domain.services import (
     ConstraintFusionDomainService,
     ConstraintReconstructionDomainService,
@@ -196,19 +199,29 @@ class TrainConstraintFusedHighModifyBatchUseCase:
             line_cmd_mask=line_cmd_mask,
             line_index_map=line_index_map,
             max_lines=unary_logits.size(1),
+            commands=commands,
         )
-        geom_loss, geom_metrics = self.constraint_evaluator(soft_lines, unary_gt, pair_gt, line_mask=line_mask)
+        geom_components, geom_metrics = self.constraint_evaluator(
+            soft_lines, unary_gt, pair_gt, line_mask=line_mask
+        )
         if not getattr(self.cfg, "enable_soft_geometry", True):
-            geom_loss = geom_loss * 0.0
-        alpha, beta, gamma = aux_weights if aux_weights is not None else (
-            self.cfg.alpha,
-            self.cfg.beta,
-            self.cfg.gamma,
-        )
+            geom_components = {key: value * 0.0 for key, value in geom_components.items()}
+
+        if aux_weights is None:
+            aux_weights = resolve_aux_weights(self.cfg, getattr(self.cfg, "_current_epoch", 1))
+        if len(aux_weights) == 3:
+            alpha, beta, gamma_legacy = aux_weights
+            gamma_h = gamma_v = gamma_para = gamma_perp = float(gamma_legacy)
+        else:
+            alpha, beta, gamma_h, gamma_v, gamma_para, gamma_perp = aux_weights
+
         composed = LossComposer(
             alpha=alpha,
             beta=beta,
-            gamma=gamma,
+            gamma_h=gamma_h,
+            gamma_v=gamma_v,
+            gamma_para=gamma_para,
+            gamma_perp=gamma_perp,
             pos_weight=self.cfg.pos_weight,
         ).compose(
             cmd_loss=loss_cmd,
@@ -218,7 +231,13 @@ class TrainConstraintFusedHighModifyBatchUseCase:
             unary_gt=unary_gt,
             pair_gt=pair_gt,
             line_mask=line_mask,
-            geom_loss=geom_loss,
+            geom_components=geom_components,
+        )
+        geom_loss_legacy = (
+            geom_components["geom_h"]
+            + geom_components["geom_v"]
+            + geom_components["geom_para"]
+            + geom_components["geom_perp"]
         )
         return {
             "loss": composed["loss"],
@@ -229,14 +248,23 @@ class TrainConstraintFusedHighModifyBatchUseCase:
             "recon_loss": composed["recon_loss"],
             "unary_recon_loss": composed["unary_recon_loss"],
             "pair_recon_loss": composed["pair_recon_loss"],
-            "geom_loss": geom_loss,
+            "geom_loss": geom_loss_legacy,
+            "geom_total": composed["geom_total"],
+            "geom_h_loss": geom_components["geom_h"],
+            "geom_v_loss": geom_components["geom_v"],
+            "geom_para_loss": geom_components["geom_para"],
+            "geom_perp_loss": geom_components["geom_perp"],
             "geom_horizontal": geom_metrics["geom_horizontal"],
             "geom_vertical": geom_metrics["geom_vertical"],
             "geom_parallel": geom_metrics["geom_parallel"],
             "geom_perpendicular": geom_metrics["geom_perpendicular"],
             "aux_alpha": alpha,
             "aux_beta": beta,
-            "aux_gamma": gamma,
+            "aux_gamma": gamma_h,
+            "aux_gamma_h": gamma_h,
+            "aux_gamma_v": gamma_v,
+            "aux_gamma_para": gamma_para,
+            "aux_gamma_perp": gamma_perp,
             "unary_logits": unary_logits,
             "pair_logits": pair_logits,
             "z": z,
@@ -270,8 +298,13 @@ def build_train_use_case(cfg, device: torch.device) -> TrainConstraintFusedHighM
         interpreter=DifferentiableSketchInterpreter(
             n_bins=cfg.args_dim + 1,
             coord_range=(cfg.coord_range_min, cfg.coord_range_max),
+            use_corrected_line_start=getattr(cfg, "use_corrected_line_start", False),
         ).to(device),
-        constraint_evaluator=DifferentiableConstraintEvaluator().to(device),
+        constraint_evaluator=DifferentiableConstraintEvaluator(
+            use_hard_geom_bce=getattr(cfg, "use_hard_geom_bce", False),
+            bce_scale=getattr(cfg, "hard_geom_bce_scale", 6.0),
+            pos_weight=getattr(cfg, "hard_geom_pos_weight", 5.0),
+        ).to(device),
         cad_loss=CommandCadLoss(cfg).to(device),
     )
     return TrainConstraintFusedHighModifyBatchUseCase(artifacts=artifacts, cfg=cfg, device=device)

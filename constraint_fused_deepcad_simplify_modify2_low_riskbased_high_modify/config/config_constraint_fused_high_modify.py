@@ -118,6 +118,55 @@ class ConfigConstraintFusedHighModify:
         parser.add_argument("--alpha", type=float, default=3.0)
         parser.add_argument("--beta", type=float, default=1.0)
         parser.add_argument("--gamma", type=float, default=3.0)
+        parser.add_argument(
+            "--gamma_horizontal",
+            type=float,
+            default=None,
+            help="Per-component gamma override for horizontal residual (A2d). "
+            "Defaults to --gamma when not set, preserving legacy behaviour.",
+        )
+        parser.add_argument(
+            "--gamma_vertical",
+            type=float,
+            default=None,
+            help="Per-component gamma override for vertical residual (A2d).",
+        )
+        parser.add_argument(
+            "--gamma_parallel",
+            type=float,
+            default=None,
+            help="Per-component gamma override for parallel residual (A2d, recommended 3.0).",
+        )
+        parser.add_argument(
+            "--gamma_perpendicular",
+            type=float,
+            default=None,
+            help="Per-component gamma override for perpendicular residual (A2d).",
+        )
+        parser.add_argument(
+            "--use_corrected_line_start",
+            action="store_true",
+            help="A2d: derive unit = (end - prev_curve_end) / ||.|| with SOL boundary reset. "
+            "Default off keeps the legacy unit = (args[:2] - args[2:4]) behaviour.",
+        )
+        parser.add_argument(
+            "--use_hard_geom_bce",
+            action="store_true",
+            help="A2d: replace single-sided geom soft residual with bidirectional hard BCE. "
+            "Default off keeps the legacy soft path.",
+        )
+        parser.add_argument(
+            "--hard_geom_bce_scale",
+            type=float,
+            default=6.0,
+            help="Scale factor mapping the satisfaction score in [0,1] into a BCE logit.",
+        )
+        parser.add_argument(
+            "--hard_geom_pos_weight",
+            type=float,
+            default=5.0,
+            help="pos_weight argument for the hard geom BCE (default mirrors recon_loss).",
+        )
         parser.add_argument("--aux_schedule", type=str, default="constant", choices=["constant", "warmup"])
         parser.add_argument("--aux_warmup_start_epoch", type=int, default=10)
         parser.add_argument("--aux_warmup_end_epoch", type=int, default=30)

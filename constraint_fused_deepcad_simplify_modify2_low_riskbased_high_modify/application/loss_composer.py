@@ -51,10 +51,32 @@ def compose_recon_loss(
 
 
 class LossComposer:
-    def __init__(self, alpha: float = 0.1, beta: float = 0.5, gamma: float = 0.2, pos_weight: float = 5.0):
+    """Combine the CAD reconstruction loss with auxiliary constraint losses.
+
+    The geometry term is decomposed into four components -- ``geom_h``, ``geom_v``,
+    ``geom_para`` and ``geom_perp`` -- weighted by ``gamma_h``, ``gamma_v``,
+    ``gamma_para`` and ``gamma_perp`` respectively. In legacy mode (A1/A2/A2b/A2c)
+    the four gammas are equal to a single ``gamma`` value so the total reduces to
+    ``gamma * (L_h + L_v + L_para + L_perp)`` which matches the prior single-term
+    ``self.gamma * geom_loss`` expression.
+    """
+
+    def __init__(
+        self,
+        alpha: float = 0.1,
+        beta: float = 0.5,
+        gamma_h: float = 0.2,
+        gamma_v: float = 0.2,
+        gamma_para: float = 0.2,
+        gamma_perp: float = 0.2,
+        pos_weight: float = 5.0,
+    ):
         self.alpha = alpha
         self.beta = beta
-        self.gamma = gamma
+        self.gamma_h = gamma_h
+        self.gamma_v = gamma_v
+        self.gamma_para = gamma_para
+        self.gamma_perp = gamma_perp
         self.pos_weight = pos_weight
 
     def compose(
@@ -66,7 +88,7 @@ class LossComposer:
         unary_gt: torch.Tensor,
         pair_gt: torch.Tensor,
         line_mask: torch.Tensor,
-        geom_loss: torch.Tensor,
+        geom_components: dict,
     ) -> dict:
         recon_loss, unary_loss, pair_loss = compose_recon_loss(
             unary_logits,
@@ -76,10 +98,17 @@ class LossComposer:
             line_mask=line_mask,
             pos_weight=self.pos_weight,
         )
-        total = cmd_loss + self.alpha * pred_loss + self.beta * recon_loss + self.gamma * geom_loss
+        geom_total = (
+            self.gamma_h * geom_components["geom_h"]
+            + self.gamma_v * geom_components["geom_v"]
+            + self.gamma_para * geom_components["geom_para"]
+            + self.gamma_perp * geom_components["geom_perp"]
+        )
+        total = cmd_loss + self.alpha * pred_loss + self.beta * recon_loss + geom_total
         return {
             "loss": total,
             "recon_loss": recon_loss,
             "unary_recon_loss": unary_loss,
             "pair_recon_loss": pair_loss,
+            "geom_total": geom_total,
         }
