@@ -42,6 +42,11 @@ class ConfigStep:
         self.log_dir = os.path.join(self.exp_dir, "log")
         self.model_dir = os.path.join(self.exp_dir, "model")
         self.artifact_dir = os.path.join(self.exp_dir, "artifacts")
+        self.default_eval_dir = os.path.join(self.artifact_dir, "{}_eval_latest".format(self.eval_split))
+        self.default_reconstruction_dir = os.path.join(
+            self.artifact_dir,
+            "reconstruction_{}_latest".format(self.eval_split),
+        )
         ensure_dirs([self.log_dir, self.model_dir, self.artifact_dir])
 
         if self.gpu_ids is not None and self.gpu_ids != "cpu":
@@ -77,6 +82,7 @@ class ConfigStep:
             "loss_cmd_weight": 1.0,
             "loss_args_weight": 2.0,
         }
+        self.augment = False
 
     def parse(self):
         parser = argparse.ArgumentParser()
@@ -87,7 +93,12 @@ class ConfigStep:
         parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda"])
 
         parser.add_argument("--batch_size", type=int, default=64)
-        parser.add_argument("--num_workers", type=int, default=4)
+        parser.add_argument(
+            "--num_workers",
+            type=int,
+            default=4,
+            help="Use 0 with --dataset_cache disk to avoid duplicate cache builds.",
+        )
         parser.add_argument("--nr_epochs", type=int, default=100)
         parser.add_argument("--lr", type=float, default=1e-3)
         parser.add_argument("--grad_clip", type=float, default=1.0)
@@ -144,8 +155,14 @@ class ConfigStep:
         if not self.is_train:
             parser.add_argument("--model_path", type=str, default=None)
             parser.add_argument("--reconstruction_dir", type=str, default=None)
+            parser.add_argument("--outputs", type=str, default=None, help="Constraint/ACC eval output dir.")
             parser.add_argument("--skip_reconstruct", action="store_true")
-            parser.add_argument("--sample_count", type=int, default=8)
+            parser.add_argument(
+                "--sample_count",
+                type=int,
+                default=0,
+                help="0 evaluates the full split; use a small value only for debugging.",
+            )
 
         args = parser.parse_args()
         if args.legacy_line_start:

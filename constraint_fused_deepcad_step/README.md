@@ -16,7 +16,10 @@
 | --- | --- |
 | 配置 | `config/config_step.py` |
 | 训练入口 | `train.py` |
+| 重建入口 | `reconstruct.py` |
+| 评估入口 | `evaluate.py` |
 | 训练用例 | `application/train_use_case.py` |
+| 重建/评估逻辑 | `application/evaluate_reconstruction.py` |
 | GT 关系数据 | `infrastructure/dataset_step.py` |
 | 预测线解析 | `application/differentiable_sketch_interpreter.py` |
 | 正关系 L_geom | `application/geometry_constraint.py` |
@@ -41,13 +44,13 @@ python -m constraint_fused_deepcad_step.train \
   --batch_size 64 --nr_epochs 100 \
   -g 0
 
-# S2: 弱正关系 L_geom（推荐开启 disk cache，避免重复解析 GT 关系）
+# S2: 弱正关系 L_geom（推荐 disk cache + num_workers=0）
 python -m constraint_fused_deepcad_step.train \
   --proj_dir proj_log/constraint_fused_deepcad_step \
   --exp_name deepcad_step_s2_geom_pos \
   --data_root D:/DeepCAD/DeepCAD/data \
   --enable_geom_loss --gamma_geom 0.1 \
-  --dataset_cache disk \
+  --dataset_cache disk --num_workers 0 \
   --batch_size 64 --nr_epochs 100 \
   -g 0
 ```
@@ -59,6 +62,62 @@ python -m constraint_fused_deepcad_step.train \
 ```
 
 每个 `.pt` 含 `command/args/groups/unary_gt/pair_gt/line_*` 等字段；源 h5 变更时会自动失效并重建。
+
+**注意**：`--dataset_cache disk` 时请配合 `--num_workers 0`，避免多 worker 重复建 cache。
+
+## 评估（TrainRules §4）
+
+评估分两步：硬解码重建 `*_vec.h5` → 离散 ACC + index-aligned 约束指标。
+
+默认输出：
+
+| 产物 | 路径 |
+| --- | --- |
+| 重建向量 | `{exp_dir}/artifacts/reconstruction_{eval_split}_latest/*_vec.h5` |
+| 离散 ACC | `{reconstruction_dir}_acc_stat.txt` |
+| 约束汇总 | `{exp_dir}/artifacts/{eval_split}_eval_latest/summary.json` |
+| 逐样本约束 | `{exp_dir}/artifacts/{eval_split}_eval_latest/per_sample_counts.csv` |
+
+`ratio_h` / `ratio_v` / `parallel` / `perpendicular` 采用 **index-aligned** 口径（与 High Modify `evaluate_constraints` 一致），可与主路径消融表对齐。
+
+### 一步完成（重建 + ACC + 约束聚合）
+
+```bash
+python -m constraint_fused_deepcad_step.evaluate \
+  --proj_dir proj_log/constraint_fused_deepcad_step \
+  --exp_name deepcad_step_s2_geom_pos \
+  --data_root D:/DeepCAD/DeepCAD/data \
+  --ckpt latest \
+  --eval_split test \
+  -g 0
+```
+
+### 分步执行
+
+```bash
+# 1) 仅重建
+python -m constraint_fused_deepcad_step.reconstruct \
+  --proj_dir proj_log/constraint_fused_deepcad_step \
+  --exp_name deepcad_step_s2_geom_pos \
+  --data_root D:/DeepCAD/DeepCAD/data \
+  --ckpt 20 \
+  --reconstruction_dir proj_log/constraint_fused_deepcad_step/deepcad_step_s2_geom_pos/artifacts/reconstruction_test_ep20
+
+# 2) 跳过重建，只重算指标
+python -m constraint_fused_deepcad_step.evaluate \
+  --proj_dir proj_log/constraint_fused_deepcad_step \
+  --exp_name deepcad_step_s2_geom_pos \
+  --skip_reconstruct \
+  --reconstruction_dir proj_log/constraint_fused_deepcad_step/deepcad_step_s2_geom_pos/artifacts/reconstruction_test_ep20
+```
+
+子集调试（不写进论文主表）：
+
+```bash
+python -m constraint_fused_deepcad_step.evaluate \
+  ... \
+  --sample_count 8
+```
 
 ## Gate 验证（P0-01 ~ G3）
 

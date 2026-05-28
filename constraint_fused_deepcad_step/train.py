@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import os
 from collections import OrderedDict
 
@@ -10,7 +9,7 @@ from tqdm import tqdm
 
 from trainer.base import TrainClock
 from trainer.scheduler import GradualWarmupScheduler
-from utils import cycle, ensure_dir
+from utils import cycle
 
 from constraint_fused_deepcad_step.application.device import resolve_device
 from constraint_fused_deepcad_step.application.train_use_case import build_train_use_case
@@ -42,16 +41,6 @@ def load_ckpt(use_case, optimizer, scheduler, clock: TrainClock, cfg) -> None:
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
     clock.restore_checkpoint(checkpoint["clock"])
-
-
-def append_csv_row(csv_path: str, row: dict) -> None:
-    ensure_dir(os.path.dirname(csv_path))
-    write_header = not os.path.exists(csv_path)
-    with open(csv_path, "a", newline="", encoding="utf-8") as file_obj:
-        writer = csv.DictWriter(file_obj, fieldnames=list(row.keys()))
-        if write_header:
-            writer.writeheader()
-        writer.writerow(row)
 
 
 def _scalar(value):
@@ -89,8 +78,6 @@ def main() -> None:
         },
         dataset_split="train",
     )
-    metrics_csv = os.path.join(cfg.artifact_dir, "train_metrics.csv")
-
     stop_requested = False
     best_ckpt_path = ""
     for epoch in range(clock.epoch, cfg.nr_epochs + 1):
@@ -130,7 +117,6 @@ def main() -> None:
                 for key, value in metrics.items():
                     train_tb.add_scalar(key, value, clock.step)
                 row = {"epoch": epoch, "step": clock.step, **metrics}
-                append_csv_row(metrics_csv, row)
                 tracker.append_train_metrics(row)
 
             if clock.step % cfg.val_frequency == 0:
