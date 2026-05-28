@@ -24,8 +24,12 @@
 | 预测线解析 | `application/differentiable_sketch_interpreter.py` |
 | 正关系 L_geom | `application/geometry_constraint.py` |
 | Gate 验证 | `verify_gates.py` |
+| 训练命令（bat） | `训练命令.bat` |
+| 评估命令（bat） | `评估命令.bat` |
 
 ## 训练示例
+
+Windows 可直接双击或运行包内 **`训练命令.bat`**（默认 S2 + `gamma_geom` 在 epoch 21–31 warmup）。评估见 **`评估命令.bat`**。
 
 ```bash
 # S0: 原始 DeepCAD（无 L_geom 反传）
@@ -52,6 +56,17 @@ python -m constraint_fused_deepcad_step.train \
   --enable_geom_loss --gamma_geom 0.1 \
   --dataset_cache disk --num_workers 0 \
   --batch_size 64 --nr_epochs 100 \
+  -g 0
+
+# S2 + gamma_geom warmup：epoch 1–20 为 0，21–30 线性升至 0.1，31+ 满值（见 训练命令.bat）
+python -m constraint_fused_deepcad_step.train \
+  --proj_dir proj_log/constraint_fused_deepcad_step \
+  --exp_name deepcad_step_s2_geom_pos_warmup21_31 \
+  --data_root D:/DeepCAD/DeepCAD/data \
+  --enable_geom_loss --gamma_geom 0.1 \
+  --geom_warmup_start_epoch 21 --geom_warmup_end_epoch 31 \
+  --dataset_cache disk --num_workers 0 \
+  --batch_size 64 --nr_epochs 100 --warmup_step 2000 \
   -g 0
 ```
 
