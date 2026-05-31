@@ -18,8 +18,7 @@ def ensure_dir(path):
     :param paths: path
     :return:
     """
-    if not os.path.exists(path):
-        os.makedirs(path)
+    os.makedirs(path, exist_ok=True)
 
 
 def ensure_dirs(paths):

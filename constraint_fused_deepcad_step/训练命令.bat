@@ -3,7 +3,7 @@ REM Constraint-Fused DeepCAD Step — 训练命令（在仓库根目录执行）
 cd /d "%~dp0.."
 
 REM 按需修改数据根目录
-set DATA_ROOT=D:\DeepCAD\DeepCAD\data
+set DATA_ROOT=D:\CF-DeepCAD\data
 set PROJ_DIR=proj_log/constraint_fused_deepcad_step
 set GPU=0
 
@@ -43,9 +43,10 @@ python -m constraint_fused_deepcad_step.train ^
   --geom_warmup_end_epoch 31 ^
   --dataset_cache disk ^
   --num_workers 4 ^
-  --batch_size 64 ^
-  --nr_epochs 100 ^
+  --batch_size 512 ^
+  --nr_epochs 500 ^
   --warmup_step 2000 ^
+  --continue --ckpt latest ^
   -g %GPU%
 
 REM 续训（同一 exp_name，从 checkpoint 接着跑）：
