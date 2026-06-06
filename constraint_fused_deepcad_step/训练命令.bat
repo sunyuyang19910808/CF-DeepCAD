@@ -42,14 +42,28 @@ python -m constraint_fused_deepcad_step.train ^
   --geom_warmup_start_epoch 21 ^
   --geom_warmup_end_epoch 31 ^
   --dataset_cache disk ^
-  --num_workers 4 ^
+  --num_workers 0 ^
   --batch_size 64 ^
-  --nr_epochs 100 ^
+  --nr_epochs 200 ^
   --warmup_step 2000 ^
   -g %GPU%
 
-REM 续训（同一 exp_name，从 checkpoint 接着跑）：
-REM   在上面的命令末尾追加 --continue --ckpt latest
+REM 续训 epoch 200 -> 500，gamma_geom=0.2（从 latest 接着跑，约 300 epoch）：
+REM python -m constraint_fused_deepcad_step.train ^
+REM   --proj_dir %PROJ_DIR% ^
+REM   --exp_name deepcad_step_s2_geom_pos_warmup21_31 ^
+REM   --data_root %DATA_ROOT% ^
+REM   --enable_geom_loss ^
+REM   --gamma_geom 0.2 ^
+REM   --geom_warmup_start_epoch 21 ^
+REM   --geom_warmup_end_epoch 31 ^
+REM   --dataset_cache disk ^
+REM   --num_workers 0 ^
+REM   --batch_size 64 ^
+REM   --nr_epochs 500 ^
+REM   --warmup_step 2000 ^
+REM   --continue --ckpt latest ^
+REM   -g %GPU%
 
 REM epoch 21 起立刻满 gamma_geom（无线性 ramp）：
 REM   --geom_warmup_start_epoch 21 --geom_warmup_end_epoch 21
