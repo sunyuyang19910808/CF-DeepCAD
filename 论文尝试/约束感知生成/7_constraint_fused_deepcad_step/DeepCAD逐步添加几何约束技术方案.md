@@ -14,6 +14,8 @@ CAD command/args -> Encoder -> Bottleneck -> z -> Decoder -> command_logits/args
 
 此前 A2c 使用软几何残差约束，训练侧的 `geom_*` 指标可以下降，但最终测试侧需要经过 `argmax -> CAD vector -> CADSequence -> index-aligned 几何指标`，训练目标与评估口径存在差异。A2d 进一步引入 GT 关系监督和 hard BCE，但双向监督会把所有 GT=0 的 line/pair 都作为强负样本，容易产生额外梯度冲击。
 
+**S2 实验进一步暴露的问题**：当前正样本 BCE 使用 `score = 1 - uy²` 等软代理，在 0.1° 尺度上迅速饱和——测试要求 `angle < 0.1°`，但训练 loss 在远大于 0.1° 的误差范围内已近乎为零，无法有效驱动 0.1° 精度优化。详见专项文档：`训练测试约束指标对齐问题与方案.md`。
+
 本方案回到原始 DeepCAD 主路径，只增加一个几何约束模块，并采用更保守的正关系监督：
 
 ```text
@@ -491,6 +493,40 @@ gt_parallel[0, 3] = 0
 
 第一版不会因为它预测得接近平行而产生强负样本损失。这样可以避免模型为了避开大量负样本而把线方向推离合理几何。
 
+### 6.8 训练-测试约束指标对齐问题（已知局限）
+
+#### 模块作用
+
+记录 S2 正样本 BCE 与 test 硬角度 recall 之间的 **度量不对齐** 问题，并指向改进路线，避免仅调 `bce_scale` / `gamma_geom` 却无法提升 test `parallel` / `perpendicular`。
+
+#### 模块原理
+
+| 维度 | 训练（S2 `_positive_bce`） | 测试（`angle_thresh=0.1°`） |
+|------|---------------------------|----------------------------|
+| 水平 | `score_h = 1 - uy² → 1` | `angle(u, ex) < 0.1°` |
+| 平行 | `score_par = \|u_i·u_j\| → 1` | `angle(u_i, u_j) < 0.1°` |
+| 判定 | 连续软得分 + BCE | 硬阈值 0/1 hit |
+
+小角度数值例（水平）：θ=0.1° 时 `score_h≈0.999997`、θ=1° 时 `score_h≈0.9997`，但测试上 1° 已判失败。BCE 在 score≈1 区间梯度极小，**无法有效优化 0.1° 精度**。
+
+#### 改进方向（详见专项文档）
+
+1. **Phase 5A（首选）**：角度 Hinge Loss，`relu(angle_deg - angle_thresh)`，与 `undirected_angle_deg` 同定义。
+2. **Phase 5B（进阶）**：硬角度 Surrogate + `ConstraintMetricCore`，训练 recall 与 test `summary.json` 同公式。
+3. **Phase 5C（辅助）**：STE 硬量化解释器，缩小 soft 坐标与 test argmax 偏差。
+
+专项文档：`训练测试约束指标对齐问题与方案.md`。
+
+#### 举例说明
+
+GT 要求水平，预测 `unit=(0.9998, 0.01745)`（约 1° 偏差）：
+
+```text
+当前 BCE：score_h=0.9997，L_h≈0.003（几乎无惩罚）
+角度 Hinge：angle_h≈1.0°，L_h=relu(1.0-0.1)=0.9（明确惩罚）
+测试评估：1.0° > 0.1° → miss
+```
+
 ---
 
 ## 7. 训练流程设计
@@ -798,7 +834,20 @@ GT 关系提取与测试评估使用相同 line 顺序和 index-aligned 口径
 预测解析采用明确的 Line start/end 规则
 ```
 
-### 10.4 实验对比风险
+### 10.4 训练-测试约束度量不对齐风险
+
+风险：S2 正样本 BCE 优化 `score→1`，测试判定 `angle < 0.1°`；训练 `geom_*↓` 与 test `parallel↑` 可能脱钩。
+
+控制：
+
+```text
+优先采用角度 Hinge 或 hard angle surrogate 替代 BCE(score)
+训练与测试共用 --angle_thresh 0.1
+以 summary.json 四项 recall 为最终验收，不以训练 geom_* 代替
+详见：训练测试约束指标对齐问题与方案.md
+```
+
+### 10.5 实验对比风险
 
 风险：不同实验混用评估脚本、阈值或 ratio 口径，导致结论不可比。
 
@@ -863,7 +912,7 @@ loss_args_weight
 
 本方案的核心是：在原始 DeepCAD 的 `P(S | z)` 主生成路径上，只增加一个训练期几何正关系恢复损失。
 
-与 A2c 相比，本方案不再只依赖与最终评估脱节的软几何残差，而是从 GT CAD 中提取明确的 line / pair 关系作为监督来源。
+与 A2c 相比，本方案从 GT CAD 中提取明确的 line / pair 关系作为监督来源；S2 首版仍使用软 score + 正样本 BCE，已识别与 0.1° 硬角度评估的度量不对齐问题，改进方案见 `训练测试约束指标对齐问题与方案.md`。
 
 与 A2d 相比，本方案只保留“GT 关系提取并监督预测关系”的思想，不采用双向 hard BCE 的强负样本惩罚，也不引入 `L_pred`、`L_recon`、强 `gamma_para` 或额外约束输入。
 
