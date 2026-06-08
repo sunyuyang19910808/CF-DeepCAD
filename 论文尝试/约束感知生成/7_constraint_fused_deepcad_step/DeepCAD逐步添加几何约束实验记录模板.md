@@ -2,7 +2,7 @@
 
 > 方案文档：`DeepCAD逐步添加几何约束技术方案.md`  
 > 评估口径：index-aligned `ratio_h/v`、`parallel/perpendicular`；`parse_fail`=`n_parse_fail_pred`；`ext_mismatch`=`n_samples_extrude_count_mismatch`。  
-> 数据更新时间：**2026-05-28**
+> 数据更新时间：**2026-05-31**
 
 ---
 
@@ -43,110 +43,21 @@
 
 ## 4. 统一评估结果
 
-> **参考行说明**：论文主表「原始 DeepCAD @1000」的 `ratio_h/v` 为 **全局计数比** `Σpred/Σgt`；本表 Origin/S2 均为 **index-aligned 槽位正确率**，与 `parallel/perpendicular` 可直接对比，但不宜与论文 `ratio_h/v` 数值混读。
+> **参考行说明**：论文主表「原始 DeepCAD @1000」的 `ratio_h/v` 为 **全局计数比** `Σpred/Σgt`；本表 Origin/S2 均为 **index-aligned 槽位正确率**，与 `parallel/perpendicular` 可直接对比，但不宜与论文 `ratio_h/v` 数值混读。  
+> **OriginDeepCAD**：test 评估按 **每 50 epoch** 记录（`origin_eval_every50_summary.csv`）。
 
 | 实验 | epoch | `ACC_cmd` | `ACC_param` | `ratio_h` | `ratio_v` | `parallel` | `perpendicular` | `parse_fail` | `ext_mismatch` | 结论 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | 原始 DeepCAD | 1000 | 0.9936 | 0.9759 | 0.9579* | 0.9656* | 0.8617 | 0.9279 | 29 | 64 | 论文参考；`ratio_*` 为全局计数比 |
-| OriginDeepCAD | 5 | 0.9261 | — | 0.8491 | 0.8468 | 0.6228 | 0.8918 | 389 | 1064 | `ckpt_epoch5.pth`；`test_eval_ep5/` |
-| OriginDeepCAD | 10 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 15 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 20 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 25 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 30 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 35 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 40 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 45 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 50 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 55 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 60 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 65 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 70 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 75 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 80 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 85 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 90 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 95 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 100 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 105 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 110 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 115 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 120 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 125 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 130 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 135 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 140 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 145 | 0.9905 | 0.9657 | 0.9385 | 0.9393 | 0.8117 | 0.9162 | 52 | 58 | `ckpt_epoch145.pth`；`test_eval_ep145/` |
-| OriginDeepCAD | 150 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 155 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 160 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 165 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 170 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 175 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 180 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 185 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 190 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 195 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 200 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 205 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 210 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 215 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 220 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 225 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 230 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 235 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 240 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 245 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 250 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 255 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 260 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 265 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 270 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 275 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 280 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 285 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 290 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 295 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 300 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 305 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 310 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 315 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 320 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 325 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 330 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 335 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 340 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 345 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 350 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 355 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 360 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 365 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 370 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 375 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 380 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 385 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 390 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 395 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 400 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 405 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 410 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 415 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 420 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 425 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 430 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 435 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 440 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 445 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 450 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 455 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 460 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 465 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 470 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 475 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 480 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 485 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 490 | — | — | — | — | — | — | — | — | 未评估 |
-| OriginDeepCAD | 495 | — | — | — | — | — | — | — | — | 未评估 |
+| OriginDeepCAD | 50 | 0.9872 | 0.9553 | 0.9276 | 0.9260 | 0.7816 | 0.9082 | 64 | 87 | `ckpt_epoch50.pth`；`test_eval_ep50/` |
+| OriginDeepCAD | 100 | 0.9895 | 0.9627 | 0.9323 | 0.9340 | 0.7966 | 0.9086 | 51 | 82 | `ckpt_epoch100.pth`；`test_eval_ep100/` |
+| OriginDeepCAD | 150 | 0.9904 | 0.9659 | 0.9388 | 0.9415 | 0.8202 | 0.9185 | 52 | 64 | `ckpt_epoch150.pth`；`test_eval_ep150/` |
+| OriginDeepCAD | 200 | 0.9912 | 0.9678 | 0.9427 | 0.9439 | 0.8280 | 0.9215 | 40 | 67 | `ckpt_epoch200.pth`；`test_eval_ep200/` |
+| OriginDeepCAD | 250 | 0.9917 | 0.9689 | 0.9430 | 0.9447 | 0.8224 | 0.9185 | 46 | 61 | `ckpt_epoch250.pth`；`test_eval_ep250/` |
+| OriginDeepCAD | 300 | 0.9920 | 0.9695 | 0.9396 | 0.9420 | 0.8184 | 0.9146 | 39 | 62 | `ckpt_epoch300.pth`；`test_eval_ep300/` |
+| OriginDeepCAD | 350 | 0.9920 | 0.9703 | 0.9433 | 0.9441 | 0.8296 | 0.9172 | 43 | 68 | `ckpt_epoch350.pth`；`test_eval_ep350/` |
+| OriginDeepCAD | 400 | 0.9919 | 0.9710 | 0.9441 | 0.9459 | 0.8287 | 0.9191 | 43 | 70 | `ckpt_epoch400.pth`；`test_eval_ep400/` |
+| OriginDeepCAD | 450 | 0.9922 | 0.9713 | 0.9453 | 0.9478 | 0.8344 | 0.9233 | 39 | 72 | `ckpt_epoch450.pth`；`test_eval_ep450/` |
 | OriginDeepCAD | 500 | 0.9926 | 0.9717 | 0.9472 | 0.9511 | 0.8413 | 0.9258 | 43 | 67 | `ckpt_epoch500.pth`；`test_eval_ep500/` |
 | S2 | 5 | — | — | — | — | — | — | — | — | 未评估 |
 | S2 | 10 | — | — | — | — | — | — | — | — | 未评估 |
@@ -160,6 +71,8 @@
 | S2 | 329 | 0.9919 | 0.9690 | 0.9485 | 0.9509 | 0.8402 | 0.9264 | 56 | 56 | **中断点**；`latest.pth`；`test_eval_latest/` |
 | S2 | 500 | — | — | — | — | — | — | — | — | 未训完 |
 
+**Origin 长训曲线（每 50 epoch）**：`ACC_param` 0.9553→0.9717（ep50→500）；`parallel` 0.7816→0.8413；`perpendicular` 0.9082→0.9258；ep250–450 平台期，`parallel` 峰值 ep500。
+
 **同 epoch 对照（145）**：S2 vs Origin — `parallel` +0.88 pt，`ACC_param` −0.22 pt，中期 L_geom 约束收益不明显。
 
 **长训对照（Origin@500 vs S2@329）**：Origin `ACC_param` +0.27 pt、`parallel` +0.11 pt；S2 `perpendicular` +0.06 pt、`ratio_h/v` 略高；**整体基本持平，S2 未显著超越 Origin**。
@@ -172,7 +85,7 @@
 - **S2 vs Origin @145**：约束与 ACC 差异 <1 pt，**中期看不出 L_geom 净收益**；S2 `parallel` 略高（0.8205 vs 0.8117）。
 - **S2@329 vs Origin@500**：长训后二者 **几乎打平**；S2 未在 hard 约束上稳定超越 Origin，`ACC_param` 仍低于论文 DeepCAD@1000（0.9759）约 0.5 pt。
 - **训练–评估脱钩**：S2 训练 `loss_geom` 持续下降，但 test 硬约束相对 Origin **无明确优势**（soft surrogate vs argmax+硬角）。
-- **下一步**：① Origin 每 5 epoch 批量 eval **后台运行中**（脚本 `proj_log/OriginDeepCAD/artifacts/_run_origin_every5_eval.py`；完成后执行 `_gen_origin_record_tables.py` + `_patch_experiment_record.py` 刷新 §4）；② 续训 S2 至 500 再与 Origin@500 对齐比较；③ 若仍无约束增益，考虑更强 hard 对齐监督（A2d 路线）。
+- **下一步**：① Origin 每 50 epoch test eval 已完成（见 `origin_eval_every50_summary.csv`）；② 续训 S2 至 500 再与 Origin@500 对齐比较；③ 若仍无约束增益，考虑更强 hard 对齐监督（A2d 路线）。
 
 ---
 
@@ -310,7 +223,7 @@
 
 | 实验 | `train_metrics.csv` | `train_metrics_per_epoch.csv` | 测试汇总 | 备注 |
 | --- | --- | --- | --- | --- |
-| OriginDeepCAD | `proj_log/OriginDeepCAD/artifacts/train_metrics.csv` | `proj_log/OriginDeepCAD/artifacts/train_metrics_per_epoch.csv` | `.../artifacts/origin_all_checkpoint_eval_summary.csv`；`.../test_eval_ep{5,10,...,500}/` | `train.py`；ckpt 每 5 epoch |
+| OriginDeepCAD | `proj_log/OriginDeepCAD/artifacts/train_metrics.csv` | `proj_log/OriginDeepCAD/artifacts/train_metrics_per_epoch.csv` | `.../artifacts/origin_eval_every50_summary.csv`；`.../test_eval_ep{50,100,...,500}/` | `train.py`；ckpt 每 5 epoch |
 | S2 | `proj_log/constraint_fused_deepcad_step/deepcad_step_s2_geom_pos_warmup21_31/artifacts/train_metrics.csv` | 待生成 | `.../test_eval_latest/summary.json`（ep329）；`.../test_eval_ep145/summary.json` | step 包 + `L_geom` |
 | S1 | — | — | — | 未启动 |
 
