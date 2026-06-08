@@ -44,7 +44,11 @@ def resolve_checkpoint_path(cfg) -> str:
 
 def load_checkpoint(use_case, ckpt_path: str, device: torch.device) -> TrainClock:
     checkpoint = torch.load(ckpt_path, map_location=device)
-    use_case.load_state_dict(checkpoint["model_state_dict"])
+    state = checkpoint["model_state_dict"]
+    if isinstance(state, dict) and "model" in state:
+        use_case.load_state_dict(state)
+    else:
+        use_case.model.load_state_dict(state)
     clock = TrainClock()
     if "clock" in checkpoint:
         clock.restore_checkpoint(checkpoint["clock"])
