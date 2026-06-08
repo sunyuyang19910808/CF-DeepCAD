@@ -46,10 +46,14 @@ def _make_cfg(**overrides) -> SimpleNamespace:
         "geom_log_only": False,
         "geom_positive_only": True,
         "gamma_geom": 0.0,
+        "geom_loss_mode": "angle_hinge",
         "geom_bce_scale": 4.0,
         "geom_negative_weight": 0.0,
         "geom_warmup_start_epoch": 1,
         "geom_warmup_end_epoch": 1,
+        "geom_target_ratio": 0.0,
+        "geom_ratio_ema": 0.99,
+        "geom_gamma_min": 1e-6,
         "use_corrected_line_start": True,
     }
     base.update(overrides)
@@ -125,6 +129,34 @@ def verify_g2(cfg, device) -> None:
     print("[G2] PASS: GT relations + predicted line geometry parsing")
 
 
+def verify_g4(device) -> None:
+    cfg = _make_cfg(
+        enable_geom_loss=True,
+        geom_log_only=False,
+        gamma_geom=0.1,
+        geom_target_ratio=0.1,
+        geom_ratio_ema=0.0,
+        geom_warmup_start_epoch=1,
+        geom_warmup_end_epoch=1,
+        batch_size=2,
+        num_workers=0,
+    )
+    batch = _load_batch(cfg)
+    use_case = build_train_use_case(cfg, device)
+    use_case.train()
+    out = use_case.execute(batch, epoch=10)
+    out["loss"].backward()
+    main = out["loss_cmd"].item() + out["loss_args"].item()
+    geom = out["loss_geom"].item()
+    expected_gamma = min(0.1, max(1e-6, 0.1 * main / max(geom, 1e-8)))
+    assert abs(out["gamma_geom"].item() - expected_gamma) < 1e-4
+    assert abs(out["geom_target_ratio"].item() - 0.1) < 1e-6
+    ratio = out["geom_effective_ratio"].item()
+    assert abs(ratio - 0.1) < 0.02
+    _assert_finite("loss", out["loss"])
+    print("[G4] PASS: adaptive gamma_geom tracks geom_target_ratio={}".format(out["geom_target_ratio"].item()))
+
+
 def verify_g3(device) -> None:
     scenarios = {
         "S0": {"enable_geom_loss": False, "geom_log_only": False, "gamma_geom": 0.0},
@@ -164,11 +196,12 @@ def main() -> int:
         verify_g1(cfg, device)
         verify_g2(cfg, device)
         verify_g3(device)
+        verify_g4(device)
     except Exception as exc:
         print("Gate verification failed:", exc, file=sys.stderr)
         return 1
 
-    print("All gates P0-01..G3 verification passed.")
+    print("All gates P0-01..G4 verification passed.")
     return 0
 
 

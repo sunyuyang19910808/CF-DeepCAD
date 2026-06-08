@@ -11,7 +11,11 @@ from trainer.loss import CADLoss
 from constraint_fused_deepcad_step.application.differentiable_sketch_interpreter import (
     DifferentiableSketchInterpreter,
 )
-from constraint_fused_deepcad_step.application.geom_schedule import resolve_gamma_geom
+from constraint_fused_deepcad_step.application.geom_schedule import (
+    GeomLossEma,
+    resolve_adaptive_gamma_geom,
+    resolve_gamma_geom,
+)
 from constraint_fused_deepcad_step.application.geometry_constraint import PositiveRelationConstraintEvaluator
 from constraint_fused_deepcad_step.domain.services import build_line_mask
 
@@ -34,6 +38,11 @@ class TrainDeepCADStepBatchUseCase:
         self.cad_loss = artifacts.cad_loss
         self.cfg = cfg
         self.device = device
+        target_ratio = float(getattr(cfg, "geom_target_ratio", 0.0))
+        ema_decay = float(getattr(cfg, "geom_ratio_ema", 0.0))
+        self._geom_ema = (
+            GeomLossEma(ema_decay) if target_ratio > 0.0 and ema_decay > 0.0 else None
+        )
 
     def modules(self):
         return [self.model, self.interpreter, self.constraint_evaluator]
@@ -98,9 +107,27 @@ class TrainDeepCADStepBatchUseCase:
 
         if epoch is None:
             epoch = int(getattr(self.cfg, "_current_epoch", 1))
-        gamma_geom = resolve_gamma_geom(self.cfg, epoch)
         loss_geom = geom_components["loss_geom"]
-        loss_total = loss_cmd_weighted + loss_args_weighted + gamma_geom * loss_geom
+        main_task_loss = loss_cmd_weighted + loss_args_weighted
+        geom_target_ratio_eff = 0.0
+        if float(getattr(self.cfg, "geom_target_ratio", 0.0)) > 0.0:
+            gamma_geom, geom_target_ratio_eff = resolve_adaptive_gamma_geom(
+                self.cfg,
+                epoch,
+                main_task_loss,
+                loss_geom,
+                self._geom_ema,
+            )
+        else:
+            gamma_geom = resolve_gamma_geom(self.cfg, epoch)
+        if gamma_geom > 0.0:
+            geom_weighted = float(gamma_geom) * loss_geom
+            loss_total = main_task_loss + geom_weighted
+        else:
+            # Avoid 0 * NaN poisoning main-task loss when geom is log-only / pre-warmup.
+            geom_weighted = loss_geom.detach() * 0.0
+            loss_total = main_task_loss
+        geom_effective_ratio = geom_weighted / main_task_loss.clamp_min(1e-8)
 
         return {
             "loss": loss_total,
@@ -109,6 +136,9 @@ class TrainDeepCADStepBatchUseCase:
             "loss_args": loss_args_weighted,
             "loss_args_raw": loss_args_raw,
             "loss_geom": loss_geom,
+            "geom_weighted": geom_weighted,
+            "geom_effective_ratio": geom_effective_ratio,
+            "geom_target_ratio": torch.tensor(geom_target_ratio_eff, device=self.device),
             "gamma_geom": torch.tensor(gamma_geom, device=self.device),
             "geom_h": geom_components["geom_h"],
             "geom_v": geom_components["geom_v"],
@@ -116,6 +146,10 @@ class TrainDeepCADStepBatchUseCase:
             "geom_perpendicular": geom_components["geom_perpendicular"],
             "geom_horizontal": geom_metrics.get("geom_horizontal", torch.tensor(0.0, device=self.device)),
             "geom_vertical": geom_metrics.get("geom_vertical", torch.tensor(0.0, device=self.device)),
+            "geom_h_angle_deg": geom_metrics.get("geom_h_angle_deg", torch.tensor(0.0, device=self.device)),
+            "geom_parallel_angle_deg": geom_metrics.get(
+                "geom_parallel_angle_deg", torch.tensor(0.0, device=self.device)
+            ),
             "positive_count_h": geom_counts["positive_count_h"],
             "positive_count_v": geom_counts["positive_count_v"],
             "positive_count_parallel": geom_counts["positive_count_parallel"],
@@ -134,6 +168,8 @@ def build_train_use_case(cfg, device: torch.device) -> TrainDeepCADStepBatchUseC
             use_corrected_line_start=getattr(cfg, "use_corrected_line_start", True),
         ).to(device),
         constraint_evaluator=PositiveRelationConstraintEvaluator(
+            geom_loss_mode=getattr(cfg, "geom_loss_mode", "angle_hinge"),
+            angle_thresh=getattr(cfg, "angle_thresh", 0.1),
             bce_scale=getattr(cfg, "geom_bce_scale", 4.0),
             negative_weight=getattr(cfg, "geom_negative_weight", 0.0),
         ).to(device),

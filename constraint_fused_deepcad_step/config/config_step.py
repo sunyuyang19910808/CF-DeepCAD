@@ -139,6 +139,32 @@ class ConfigStep:
         )
         parser.add_argument("--geom_positive_only", action="store_true", default=True)
         parser.add_argument("--gamma_geom", type=float, default=0.1)
+        parser.add_argument(
+            "--geom_target_ratio",
+            type=float,
+            default=0.0,
+            help="If >0, adapt gamma_geom each step so geom_effective_ratio tracks this target "
+            "(warmup uses geom_warmup_* epochs). gamma_geom becomes the upper cap.",
+        )
+        parser.add_argument(
+            "--geom_ratio_ema",
+            type=float,
+            default=0.99,
+            help="EMA decay for main/geom losses in adaptive gamma mode; 0 disables EMA.",
+        )
+        parser.add_argument(
+            "--geom_gamma_min",
+            type=float,
+            default=1e-6,
+            help="Lower clamp for adaptively resolved gamma_geom.",
+        )
+        parser.add_argument(
+            "--geom_loss_mode",
+            type=str,
+            default="angle_hinge",
+            choices=["bce", "angle_hinge"],
+            help="bce=legacy soft-score BCE; angle_hinge=aligned with test angle_thresh recall.",
+        )
         parser.add_argument("--geom_bce_scale", type=float, default=4.0)
         parser.add_argument("--geom_negative_weight", type=float, default=0.0)
         parser.add_argument("--geom_warmup_start_epoch", type=int, default=1)
