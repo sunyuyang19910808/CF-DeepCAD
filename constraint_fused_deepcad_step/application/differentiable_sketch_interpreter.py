@@ -38,11 +38,47 @@ class DifferentiableSketchInterpreter(nn.Module):
         lo, hi = self.coord_range
         return lo + (hi - lo) * soft_idx / max(self.n_bins - 1, 1)
 
+    def _last_curve_pos_per_sol_segment(
+        self,
+        cand_idx: torch.Tensor,
+        curve_mask: torch.Tensor,
+        seg_id: torch.Tensor,
+    ) -> torch.Tensor:
+        """For each token, index of the last curve in the same SOL segment (DeepCAD loop span).
+
+        Mirrors ``Loop.from_vector`` when ``start_point=None``: the first curve in a loop uses
+        the end point (``vec[1:3]``) of the last curve before ``EOS`` in that segment.
+        """
+        B, L = cand_idx.shape
+        device = cand_idx.device
+        max_seg = int(seg_id.max().item()) + 1
+        last_curve_per_seg = torch.full((B, max_seg), -1, dtype=cand_idx.dtype, device=device)
+        if curve_mask.any():
+            b_idx, pos_idx = torch.where(curve_mask)
+            seg_ids = seg_id[b_idx, pos_idx]
+            curve_pos = cand_idx[b_idx, pos_idx]
+            flat = last_curve_per_seg.view(-1)
+            flat.scatter_reduce_(
+                0,
+                b_idx * max_seg + seg_ids,
+                curve_pos,
+                reduce="amax",
+                include_self=False,
+            )
+            last_curve_per_seg = flat.view(B, max_seg)
+        seg_lookup = seg_id.clamp_min(0).clamp_max(max_seg - 1)
+        return last_curve_per_seg.gather(1, seg_lookup)
+
     def _corrected_start_per_token(
         self,
         end_per_token: torch.Tensor,
         commands: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute per-token line starts following ``Loop.from_vector`` chain semantics.
+
+        * Same-loop chain: start = previous curve token's ``vec[1:3]`` (stored as end here).
+        * First curve after ``SOL``: start = last curve in the segment before ``EOS`` (loop close).
+        """
         B, L, _ = end_per_token.shape
         device = end_per_token.device
         long_dtype = torch.long
@@ -50,6 +86,7 @@ class DifferentiableSketchInterpreter(nn.Module):
         curve_ids = self._curve_ids_on(device)
         curve_mask = (commands.unsqueeze(-1) == curve_ids).any(dim=-1)
         sol_mask = commands == SOL_IDX
+        seg_id = sol_mask.long().cumsum(dim=1)
 
         seq_idx = torch.arange(L, device=device, dtype=long_dtype).expand(B, L)
         neg_ones = torch.full_like(seq_idx, -1)
@@ -63,10 +100,19 @@ class DifferentiableSketchInterpreter(nn.Module):
         prev_curve_pos = cand_shifted.cummax(dim=1).values
         prev_sol_pos = sol_shifted.cummax(dim=1).values
 
-        valid_prev = prev_curve_pos > prev_sol_pos
-        prev_safe = prev_curve_pos.clamp_min(0)
+        valid_chain = prev_curve_pos > prev_sol_pos
+        loop_last_curve_pos = self._last_curve_pos_per_sol_segment(cand_idx, curve_mask, seg_id)
+        in_loop = seg_id > 0
+        use_loop_close = (~valid_chain) & curve_mask & in_loop & (loop_last_curve_pos >= 0)
 
-        gathered = end_per_token.gather(1, prev_safe.unsqueeze(-1).expand(B, L, 2))
+        prev_source = torch.where(
+            valid_chain,
+            prev_curve_pos.clamp_min(0),
+            torch.where(use_loop_close, loop_last_curve_pos.clamp_min(0), torch.zeros_like(prev_curve_pos)),
+        )
+        valid_prev = valid_chain | use_loop_close
+
+        gathered = end_per_token.gather(1, prev_source.unsqueeze(-1).expand(B, L, 2))
         start_per_token = gathered * valid_prev.unsqueeze(-1).to(end_per_token.dtype)
         return start_per_token, valid_prev
 

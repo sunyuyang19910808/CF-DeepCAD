@@ -9,8 +9,8 @@ import torch
 
 from utils import ensure_dir
 
-CACHE_FORMAT_VERSION = 1
-CACHE_KEY_SCHEMA = 1
+CACHE_FORMAT_VERSION = 2
+CACHE_KEY_SCHEMA = 2
 TENSOR_FIELDS = (
     "command",
     "args",
@@ -27,6 +27,7 @@ TENSOR_FIELDS = (
 def build_dataset_cache_key(config) -> str:
     payload = {
         "version": CACHE_KEY_SCHEMA,
+        "gt_line_order": "token",
         "angle_thresh": float(config.angle_thresh),
         "dist_thresh": float(config.dist_thresh),
         "grid_size": int(config.grid_size),

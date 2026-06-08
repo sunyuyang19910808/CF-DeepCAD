@@ -10,12 +10,11 @@ from torch.utils.data import DataLoader, Dataset
 from cadlib.macro import EOS_VEC
 from model.model_utils import _get_group_mask
 
-from constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify.domain.services import iter_line_command_positions
 from constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify.sketch_preparation.batch_assembler_high_modify import (
     ConstraintBatchAssemblerHighModify,
 )
-from constraint_fused_deepcad_simplify_modify2_low_riskbased_high_modify.sketch_preparation.constraint_extractor_high_modify import (
-    ConstraintExtractorHighModify,
+from constraint_fused_deepcad_step.sketch_preparation.token_order_constraint_extractor import (
+    TokenOrderConstraintExtractorStep,
 )
 
 from constraint_fused_deepcad_step.infrastructure.dataset_cache_step import (
@@ -40,7 +39,7 @@ class CADDatasetStep(Dataset):
         self.repository = CadVectorRepository(config.data_root)
         self.all_data = self.repository.list_split_ids(phase)
         self.max_total_len = config.max_total_len
-        self.extractor = ConstraintExtractorHighModify(
+        self.extractor = TokenOrderConstraintExtractorStep(
             angle_thresh=config.angle_thresh,
             dist_thresh=config.dist_thresh,
             grid_size=config.grid_size,
@@ -115,13 +114,11 @@ class CADDatasetStep(Dataset):
         pad_len = self.max_total_len - parse_source.shape[0]
         cad_vec = np.concatenate([parse_source, EOS_VEC[np.newaxis].repeat(pad_len, axis=0)], axis=0)
 
-        _raw, relations, lines = self.extractor.extract_from_cad_vec(cad_vec)
-        max_valid_line_idx = min(len(iter_line_command_positions(cad_vec[:, 0])), len(lines))
-        relations = [rel for rel in relations if rel.line_a < max_valid_line_idx and rel.line_b < max_valid_line_idx]
+        _raw, relations, line_count = self.extractor.extract_from_cad_vec(cad_vec)
         aggregate = self.assembler.assemble_from_vec(
             cad_vec=cad_vec,
             relations=relations,
-            geometry_line_count=len(lines),
+            geometry_line_count=line_count,
             sample_id=data_id,
         )
 

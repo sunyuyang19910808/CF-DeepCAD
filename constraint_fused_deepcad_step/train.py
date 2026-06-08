@@ -100,7 +100,10 @@ def main() -> None:
                 loss_args=_scalar(out["loss_args"]),
                 loss_args_raw=_scalar(out["loss_args_raw"]),
                 loss_geom=_scalar(out["loss_geom"]),
-                gamma_geom=_scalar(out["gamma_geom"]),
+                geom_weighted=_scalar(out["geom_weighted"]),
+                geom_ratio=_scalar(out["geom_effective_ratio"]),
+                geom_target_ratio=_scalar(out["geom_target_ratio"]),
+                gamma=_scalar(out["gamma_geom"]),
                 geom_h=_scalar(out["geom_h"]),
                 geom_v=_scalar(out["geom_v"]),
                 geom_parallel=_scalar(out["geom_parallel"]),
@@ -123,8 +126,18 @@ def main() -> None:
                 use_case.eval()
                 with torch.no_grad():
                     val_out = use_case.execute(next(val_loader), epoch=epoch)
-                for key in ("loss", "loss_cmd", "loss_args", "loss_geom"):
-                    val_tb.add_scalar(key, _scalar(val_out[key]), clock.step)
+                val_metrics = OrderedDict(
+                    loss=_scalar(val_out["loss"]),
+                    loss_cmd=_scalar(val_out["loss_cmd"]),
+                    loss_args=_scalar(val_out["loss_args"]),
+                    loss_geom=_scalar(val_out["loss_geom"]),
+                    geom_weighted=_scalar(val_out["geom_weighted"]),
+                    geom_ratio=_scalar(val_out["geom_effective_ratio"]),
+                    geom_target_ratio=_scalar(val_out["geom_target_ratio"]),
+                    gamma=_scalar(val_out["gamma_geom"]),
+                )
+                for key, value in val_metrics.items():
+                    val_tb.add_scalar(key, value, clock.step)
                 use_case.train()
 
             clock.tick()

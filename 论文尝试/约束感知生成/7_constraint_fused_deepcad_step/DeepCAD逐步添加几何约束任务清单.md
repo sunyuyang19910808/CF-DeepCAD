@@ -14,6 +14,7 @@
 | 正关系 `L_geom` 模块 | P3-01、P3-02、G3 |
 | 训练编排与配置快照 | P3-03、P4-01 |
 | 统一评估与消融 | P4-02、P4-03、G4 |
+| 训练-测试约束指标对齐（角度 Hinge / Surrogate） | P5-01、P5-02、P5-03、G5 |
 
 ## 1. 使用规则
 
@@ -52,6 +53,10 @@
 | P4-02 | Phase 4 | 测试集重建与统一口径评估 | 是 | P4-01 | `[ ]` | `[ ]` |
 | P4-03 | Phase 4 | 消融：`gamma_geom`、`bce_scale`、正关系项权重 | 是 | P4-02 | `[ ]` | `[ ]` |
 | G4 | Gate 4 | 阶段性实验闭环放行 | 是 | P4-03 | `[ ]` | `[ ]` |
+| P5-01 | Phase 5 | 角度 Hinge Loss 替代正样本 BCE | 是 | G4 | `[ ]` | `[ ]` |
+| P5-02 | Phase 5 | `geom_loss_mode` 开关与 `--angle_thresh` 训练对齐 | 是 | P5-01 | `[ ]` | `[ ]` |
+| P5-03 | Phase 5 | S2+ 短程训练与 train-test recall 相关性验证 | 是 | P5-02 | `[ ]` | `[ ]` |
+| G5 | Gate 5 | 约束指标对齐改进放行 | 是 | P5-03 | `[ ]` | `[ ]` |
 
 ## 4. 全局记录位
 
@@ -59,6 +64,7 @@
 - 当前进行中的任务 ID：`____`
 - 最近一次通过的 Gate：`____`
 - 设计基线：`论文尝试/约束感知生成/7_constraint_fused_deepcad_step/DeepCAD逐步添加几何约束技术方案.md`
+- 约束对齐专项：`论文尝试/约束感知生成/7_constraint_fused_deepcad_step/训练测试约束指标对齐问题与方案.md`
 - 原始 DeepCAD 参考文档：`论文尝试/约束感知生成/0_original_deepcad/DeepCAD原始技术方案_详细版.md`
 - A2d 参考文档：`论文尝试/约束感知生成/6_constraint_fused_deepcad_high_modify/主路径消融定位实验方案.md`
 - 建议实现包目录：`constraint_fused_deepcad_step/` 或等价独立实验包
@@ -377,17 +383,80 @@
 - `summary.json`、`per_sample_counts.csv`、`config`、checkpoint 路径可追溯
 - 结论：`____`
 
+### P5-01 角度 Hinge Loss 替代正样本 BCE
+
+- 完成状态：`[ ] 未完成`  `[ ] 已完成`
+- 验证状态：`[ ] 未验证`
+- 可测试：是
+- 前置任务：G4
+- 目标：将 `L_geom` 从 `BCE(score)` 改为与 test 同定义的 `relu(angle_deg - angle_thresh)`，解决 0.1° 尺度梯度消失问题。
+- 实现清单：
+- 在 `geometry_constraint.py` 实现可微 `angle_from_x_deg`、`angle_from_y_deg`、`undirected_angle_deg`
+- 实现 `_positive_hinge(angle_deg, positive_mask, thresh_deg)`
+- 水平/竖直/平行/垂直四类均改用角度误差，不再使用 `score = 1 - uy²` 驱动反传
+- 保留正样本 mask（`GT=1` only），不引入双向负样本
+- 参考文档：`训练测试约束指标对齐问题与方案.md` §4.1
+- 建议验证：
+- `angle=0.05°`、`gt=1` → `loss≈0`
+- `angle=1.0°`、`gt=1` → `loss≈0.9`（hinge）
+- `gt=0` 不进入 loss；梯度可回传到 `args_logits`
+- 验证证据：
+- 测试文件/命令：`____`
+- 结果摘要：`____`
+
+### P5-02 `geom_loss_mode` 开关与 `--angle_thresh` 训练对齐
+
+- 完成状态：`[ ] 未完成`  `[ ] 已完成`
+- 验证状态：`[ ] 未验证`
+- 可测试：是
+- 前置任务：P5-01
+- 目标：支持 `bce` / `angle_hinge` 模式切换，训练损失与评估共用 `--angle_thresh 0.1`。
+- 实现清单：
+- config 新增 `--geom_loss_mode {bce, angle_hinge}`
+- 默认 S2 保持 `bce` 可回退；S2+ 推荐 `angle_hinge`
+- 日志区分 `geom_loss_mode`、`angle_thresh`
+- 验证证据：
+- 测试文件/命令：`____`
+- 结果摘要：`____`
+
+### P5-03 S2+ 短程训练与 train-test recall 相关性验证
+
+- 完成状态：`[ ] 未完成`  `[ ] 已完成`
+- 验证状态：`[ ] 未验证`
+- 可测试：是
+- 前置任务：P5-02
+- 目标：对比 S2（BCE）与 S2+（angle_hinge）在相同 checkpoint epoch 上的 test recall 改善。
+- 实现清单：
+- 独立 `exp_name`：`deepcad_step_s2plus_angle_hinge`
+- 对比 S2 与 S2+ 的 `summary.json` 四项 recall
+- 记录训练期 `geom_*` 与 test recall 是否同向（目标：相关性显著提升）
+- 验证证据：
+- 测试文件/命令：`____`
+- 结果摘要：`____`
+
+### G5 约束指标对齐改进放行
+
+- 完成状态：`[ ] 未完成`  `[ ] 已完成`
+- 验证状态：`[ ] 未验证`
+- 前置任务：P5-03
+- 放行标准：
+- `angle_hinge` 模式下 test `parallel` 或 `perpendicular` 相对 S2 有可见改善，或 train-test 相关性明显优于 BCE
+- `ACC_param` 退化不超过 1 pt
+- 结论：`____`
+
 ## 6. 阶段实验矩阵
 
-| 实验 ID | 目的 | `gamma_geom` | `geom_positive_only` | `geom_negative_weight` | 备注 |
-| --- | --- | ---: | --- | ---: | --- |
-| S0 | 原始 DeepCAD 复现 | 0.0 | true | 0.0 | 只训 `L_cmd + 2.0 * L_args` |
-| S1 | 几何解析日志自检 | 0.0 | true | 0.0 | 生成 GT 关系与预测 score 日志，不反传 |
-| S2 | 弱正关系监督 | 0.1 | true | 0.0 | 第一版主实验 |
-| S3a | 权重消融 | 0.05 | true | 0.0 | 更保守 |
-| S3b | 权重消融 | 0.2 | true | 0.0 | 观察收益与主任务退化 |
-| S3c | scale 消融 | 0.1 | true | 0.0 | `bce_scale=2/4/6` |
-| S4 | 可选极弱负样本 | 0.1 | true | 0.01 | 仅在假阳性已证明影响结果时启用 |
+| 实验 ID | 目的 | `gamma_geom` | `geom_loss_mode` | `geom_positive_only` | 备注 |
+| --- | --- | ---: | --- | --- | --- |
+| S0 | 原始 DeepCAD 复现 | 0.0 | — | true | 只训 `L_cmd + 2.0 * L_args` |
+| S1 | 几何解析日志自检 | 0.0 | — | true | 生成 GT 关系与预测 score 日志，不反传 |
+| S2 | 弱正关系监督（BCE） | 0.1 | `bce` | true | 第一版主实验；已知与 0.1° 评估不对齐 |
+| S2+ | 角度 Hinge 对齐 | 0.1 | `angle_hinge` | true | Phase 5 推荐主实验 |
+| S3a | 权重消融 | 0.05 | `angle_hinge` | true | 更保守 |
+| S3b | 权重消融 | 0.2 | `angle_hinge` | true | 观察收益与主任务退化 |
+| S3c | scale 消融（仅 bce 模式） | 0.1 | `bce` | true | `bce_scale=2/4/6` |
+| S4 | 可选极弱负样本 | 0.1 | `angle_hinge` | true | `geom_negative_weight=0.01` |
+| S5 | 硬角度 Surrogate（进阶） | — | `surrogate` | true | 需 `ConstraintMetricCore`；见对齐专项文档 §4.2 |
 
 ## 7. 验收指标记录模板
 
@@ -396,6 +465,7 @@
 | S0 | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ |
 | S1 | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ |
 | S2 | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ |
+| S2+ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ |
 | S3a | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ |
 | S3b | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ | ____ |
 
@@ -404,7 +474,8 @@
 | 风险 | 触发信号 | 优先处理 |
 | --- | --- | --- |
 | 主任务退化 | `loss_args` 明显升高或 `ACC_param` 下降超过 1 pt | 降低 `gamma_geom`，延后 warmup，必要时回到 S1 |
-| 几何 loss 有效但测试无提升 | 训练 `geom_*` 下降但 `summary.json` 不改善 | 检查 GT 标签、预测解析、评估脚本口径是否一致 |
+| 几何 loss 有效但测试无提升 | 训练 `geom_*` 下降但 `summary.json` 不改善 | 优先检查 train-test 度量是否对齐（BCE score vs 0.1° 硬角）；改用 `angle_hinge`（见对齐专项文档） |
+| 0.1° 精度无法优化 | `score≈1` 时 BCE loss≈0，但 test 仍 miss | 不要用 `bce_scale`/`gamma_geom` 硬调；切换到角度 Hinge 或 Surrogate |
 | 正样本过少 | `positive_count_*` 长期接近 0 | 检查 line 提取、pair mask、angle_thresh |
 | NaN/Inf | `pred_unit`、`score_*` 或 loss 出现 NaN | 检查零长度线、soft argmax 温度、norm clamp |
 | 假阳性过多 | 测试样本出现大量额外轴对齐或平行关系且影响 CAD | 先分析样本；必要时启用极弱 confident-negative margin |
@@ -420,3 +491,4 @@
 4. 已完成至少一组 S2 弱正关系训练与测试集评估。
 5. 产物包含 checkpoint、config、训练日志、`summary.json`、`per_sample_counts.csv`。
 6. 结论明确说明：该方案是否在不明显牺牲 `ACC_param` 的前提下改善了 `ratio_h/ratio_v/parallel/perpendicular`。
+7. （Phase 5）已完成 S2+ 角度 Hinge 与 S2 BCE 的对照，并记录 train-test 相关性是否改善。
