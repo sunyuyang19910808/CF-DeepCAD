@@ -108,6 +108,12 @@ class ConfigStep:
         parser.add_argument("--log_frequency", type=int, default=10)
         parser.add_argument("--continue", dest="cont", action="store_true")
         parser.add_argument("--ckpt", type=str, default="latest")
+        parser.add_argument(
+            "--init_ckpt_path",
+            type=str,
+            default="",
+            help="Load full train checkpoint from this path (for new exp_name / cross-dir resume).",
+        )
         parser.add_argument("--force_overwrite", action="store_true")
         parser.add_argument("--max_steps", type=int, default=0, help="0 means full epoch training.")
 
@@ -145,6 +151,12 @@ class ConfigStep:
             default=0.0,
             help="If >0, adapt gamma_geom each step so geom_effective_ratio tracks this target "
             "(warmup uses geom_warmup_* epochs). gamma_geom becomes the upper cap.",
+        )
+        parser.add_argument(
+            "--geom_target_ratio_start",
+            type=float,
+            default=0.0,
+            help="If >0, linearly ramp geom_target_ratio from start to --geom_target_ratio over geom_warmup_*.",
         )
         parser.add_argument(
             "--geom_ratio_ema",

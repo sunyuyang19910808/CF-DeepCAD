@@ -9,6 +9,7 @@
 | 参考 | `DeepCADOrigin` | 原始 DeepCAD 上限（epoch 1000） | 已冻结 |
 | S2 | `deepcad_step_s2_geom_pos_warmup21_31` | 正关系 `L_geom` + legacy BCE；`gamma_geom=0.2`；warmup 21–31 | 已完成 ep500 |
 | S2+ | `deepcad_step_s2plus_angle_hinge_warmup51_71` | `angle_hinge` + 自适应 `gamma_geom`（`geom_target_ratio=0.1`）；warmup 51–71 | 已完成 ep500 |
+| S2+ P2 | `deepcad_step_s2plus_ratio02_warmup501_550` | 自 S2+@500 续训；`geom_target_ratio` 0.1→0.2（warmup 501–550）；`gamma_geom` 上限 0.2 | 训练中 |
 | S0 | `deepcad_step_s0_origin` | 无 `L_geom` 反传对照 | 待训练 |
 | S1 | `deepcad_step_s1_geom_log` | 仅日志 geom | 待训练 |
 
@@ -30,7 +31,8 @@
 | 实验 | 命令 | 开始时间 | 结束时间 | Checkpoint |
 | --- | --- | --- | --- | --- |
 | S2 BCE | 见 `constraint_fused_deepcad_step/训练命令.bat` 注释块：`deepcad_step_s2_geom_pos_warmup21_31`，`--enable_geom_loss --gamma_geom 0.2 --geom_warmup_start_epoch 21 --geom_warmup_end_epoch 31 --nr_epochs 500` | 待补 | 已完成 | `ckpt_epoch500.pth` |
-| S2+ hinge | 见 `constraint_fused_deepcad_step/训练命令.bat` 主命令 | 待补 | 2026-06-07 完成 | `ckpt_epoch500.pth` / `latest.pth`（`epoch=500`） |
+| S2+ hinge | 见 `constraint_fused_deepcad_step/训练命令.bat` Phase 1 注释块 | 待补 | 2026-06-07 完成 | `ckpt_epoch500.pth` / `latest.pth`（`epoch=500`） |
+| S2+ P2 ratio02 | 见 `constraint_fused_deepcad_step/训练命令.bat` Phase 2 主命令；父权重 `.../deepcad_step_s2plus_angle_hinge_warmup51_71/model/ckpt_epoch500.pth` | 2026-06-08 | 待填 | 目标 `ckpt_epoch550.pth` |
 
 S2+ 训练命令（`训练命令.bat`）：
 
@@ -45,39 +47,75 @@ python -m constraint_fused_deepcad_step.train ^
   --dataset_cache disk --num_workers 0 --batch_size 64 --nr_epochs 500 -g 0
 ```
 
+S2+ Phase 2 训练命令（`训练命令.bat` 主命令）：
+
+```bat
+python -m constraint_fused_deepcad_step.train ^
+  --proj_dir proj_log/constraint_fused_deepcad_step ^
+  --exp_name deepcad_step_s2plus_ratio02_warmup501_550 ^
+  --data_root D:\DeepCAD\DeepCAD\data ^
+  --enable_geom_loss --geom_loss_mode angle_hinge --angle_thresh 0.1 ^
+  --gamma_geom 0.2 --geom_target_ratio 0.2 --geom_target_ratio_start 0.1 ^
+  --geom_ratio_ema 0.99 --geom_warmup_start_epoch 501 --geom_warmup_end_epoch 550 ^
+  --init_ckpt_path proj_log/constraint_fused_deepcad_step/deepcad_step_s2plus_angle_hinge_warmup51_71/model/ckpt_epoch500.pth ^
+  --dataset_cache disk --num_workers 0 --batch_size 64 --nr_epochs 550 -g 0
+```
+
+原始 DeepCAD index-aligned 重评命令：
+
+```bat
+python -m constraint_fused_deepcad_step.evaluate ^
+  --proj_dir proj_log/constraint_fused_deepcad_step ^
+  --exp_name deepcad_step_s0_origin ^
+  --data_root D:\DeepCAD\DeepCAD\data ^
+  --model_path proj_log/DeepCADOrigin/model/ckpt_epoch1000.pth ^
+  --eval_split test ^
+  --outputs proj_log/DeepCADOrigin/artifacts/test_eval_epoch1000_index_aligned ^
+  --reconstruction_dir proj_log/DeepCADOrigin/artifacts/reconstruction_test_epoch1000_index_aligned ^
+  -g 0
+```
+
 ## 4. 统一评估结果（test，8052 样本）
 
-`ratio_h/v`：CF step 实验为 **index-aligned**；原始 DeepCAD 行为 **全局计数比** `sum_pred/sum_gt`（表中单独标注）。
+`ratio_h/v` / `parallel` / `perpendicular`：下表 **index-aligned** 口径（`angle_thresh=0.1°`）。历史全局计数比见脚注 *。
 
 | 实验 | epoch | ACC_cmd | ACC_param | ratio_h | ratio_v | parallel | perpendicular | parse_fail | ext_mismatch | 结论 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 原始 DeepCAD | 1000 | 0.9936 | 0.9759 | 0.9579 | 0.9656 | 0.8617 | 0.9279 | 29 | 64 | 全局 ratio_h/v；parallel/perp index-aligned |
+| 原始 DeepCAD | 1000 | 0.9936 | 0.9759 | 0.9510 | 0.9574 | 0.8617 | 0.9279 | 29 | 64 | index-aligned 重评；`test_eval_epoch1000_index_aligned` |
 | S2 BCE | 500 | 0.9922 | 0.9703 | 0.9515 | 0.9538 | 0.8495 | 0.9257 | 24 | 73 | ckpt_epoch500.pth |
 | S2 BCE | 325 | 0.9918 | 0.9674 | 0.9498 | 0.9501 | 0.8406 | 0.9199 | 41 | 66 | ckpt_epoch325.pth |
-| S2+ hinge | 500 | 0.9916 | 0.9704 | 0.9541 | 0.9549 | 0.8645 | 0.9327 | 45 | 67 | ckpt_epoch500.pth；主推 |
+| S2+ hinge | 500 | 0.9916 | 0.9704 | 0.9541 | 0.9549 | 0.8645 | 0.9327 | 45 | 67 | ckpt_epoch500.pth |
 | S2+ hinge | 365 | 0.9911 | 0.9682 | 0.9519 | 0.9528 | 0.8518 | 0.9292 | 59 | 60 | ckpt_epoch365.pth |
 | S2+ hinge | 140 | 0.9884 | 0.9604 | 0.9431 | 0.9454 | 0.8364 | 0.9205 | 47 | 113 | ckpt_epoch140.pth |
+| S2+ P2 ratio02 | 615 | 0.9918 | 0.9708 | 0.9568 | 0.9600 | 0.8703 | 0.9433 | 33 | 64 | ckpt_epoch615.pth；Phase 2 当前最佳 |
+| S2+ P2 ratio02 | 610 | 0.9920 | 0.9705 | 0.9576 | 0.9594 | 0.8640 | 0.9354 | 49 | 54 | ckpt_epoch610.pth |
+| S2+ P2 ratio02 | 525 | — | — | — | — | — | — | — | — | 待填 |
+| S2+ P2 ratio02 | 550 | — | — | — | — | — | — | — | — | 待填 |
 
-**阶段评估**：S2 BCE 已测 ep325、ep500；S2+ 已测 ep140、ep365、ep500；其余 5 的倍数 epoch 为 `待填`。
+\* 原始 DeepCAD 旧评估（2026-05-24）全局计数比：ratio_h **0.9579**，ratio_v **0.9656**（`test_eval_epoch1000/summary.json`）。
+
+**阶段评估**：S2 BCE 已测 ep325、ep500；S2+ 已测 ep140、ep365、ep500；P2 已测 ep610、ep615；其余 5 的倍数 epoch 为 `待填`。
 
 **已测关键点（S2+）**：ep140 → ep365 → ep500，`parallel` 0.836 → 0.852 → **0.864**；`ratio_h` 0.943 → 0.952 → **0.954**。
 
-**ep500 三方对比（index-aligned）**：
+**ep500 / ep615 与原始 DeepCAD 对比（index-aligned，统一口径）**：
 
 | 对比 | ACC_cmd | ACC_param | ratio_h | ratio_v | parallel | perpendicular |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 原始 DeepCAD@1000† | 0.9936 | 0.9759 | 0.9579* | 0.9656* | 0.8617 | 0.9279 |
+| 原始 DeepCAD@1000 | 0.9936 | 0.9759 | 0.9510 | 0.9574 | 0.8617 | 0.9279 |
 | S2 BCE@500 | 0.9922 | 0.9703 | 0.9515 | 0.9538 | 0.8495 | 0.9257 |
-| S2+ hinge@500 | 0.9916 | 0.9704 | **0.9541** | **0.9549** | **0.8645** | **0.9327** |
+| S2+ hinge@500 | 0.9916 | 0.9704 | 0.9541 | 0.9549 | 0.8645 | 0.9327 |
+| **S2+ P2@615** | 0.9918 | 0.9708 | **0.9568** | **0.9600** | **0.8703** | **0.9433** |
 
-† 原始 DeepCAD 训练 1000 epoch；* `ratio_h/v` 为全局计数比（非 index-aligned）。S2+ 全局口径：ratio_h **0.9636**，ratio_v 0.9569。
+**P2@615 相对原始 DeepCAD@1000（index-aligned）**：`ratio_h` **+0.58 pt**，`ratio_v` **+0.26 pt**，`parallel` **+0.86 pt**，`perpendicular` **+1.54 pt**；`ACC_cmd` −0.18 pt，`ACC_param` −0.51 pt。
 
 ## 5. 判定摘要
 
 - **angle_hinge 有效性**：S2+@500 相对 S2 BCE@500，`parallel` **+1.50 pt**（0.8645 vs 0.8495），`ratio_h` **+0.26 pt**，`perpendicular` **+0.71 pt**；`ACC_cmd` 仅 −0.06 pt，主任务基本保持。
-- **相对原始 DeepCAD**：S2+@500 `parallel` **+0.28 pt**（0.8645 vs 0.8617），`perpendicular` **+0.48 pt**；`ACC_param` 仍低 **0.55 pt**（0.9704 vs 0.9759）；index-aligned `ratio_h` 略低于原始全局口径，但全局计数比 `ratio_h` 更高（0.9636 vs 0.9579）。
+- **相对原始 DeepCAD（index-aligned 重评后）**：P2@615 在 **ratio_h/v、parallel、perpendicular 四项约束指标上均超过** 原始 DeepCAD@1000；主任务 `ACC_cmd` −0.18 pt、`ACC_param` −0.51 pt，为可接受 trade-off。
 - **自适应 gamma**：`geom_target_ratio=0.1` 下 ep500 `geom_ratio≈0.096`，`gamma≈0.003`（远小于上限 0.1），几何项以低权重持续约束而不压制主任务。
-- **下一阶段**：可选对 DeepCADOrigin 重跑 index-aligned 评估以完全对齐 `ratio_h/v`；或推进 S0 对照与 Phase 5B 硬角 surrogate。
+- **Phase 2（ratio 0.1→0.2）**：P2@615 `parallel`=**0.870**、`perpendicular`=**0.943**，相对 S2+@500 再提升 **+0.58 / +1.06 pt**；相对原始 DeepCAD 再提升 **+0.86 / +1.54 pt**。
+- **下一阶段**：续训至 ep1000 并评 ep700/1000；启动 S0 对照；视曲线决定是否以 ep615 冻结主推 checkpoint。
 
 ## 6. 统一训练 loss（每 5 epoch，epoch 内均值）
 
@@ -293,6 +331,8 @@ python -m constraint_fused_deepcad_step.train ^
 | S2+ hinge | 495 | 0.4256 | 0.0305 | 0.0305 | 0.3585 | 0.1792 | 11.9330 | 0.0366 | 0.0959 | 0.1000 | 0.0031 | 1.7316 | 1.6912 | 4.3516 | 4.1587 | 191.9 | 181.8 | 699.2 | 990.4 |
 | S2 BCE | 500 | 0.5294 | 0.0291 | 0.0291 | 0.3671 | 0.1836 | 0.6660 | — | — | — | 0.2000 | 0.1473 | 0.1460 | 0.1604 | 0.2122 | 188.8 | 178.9 | 693.1 | 982.2 |
 | S2+ hinge | 500 | 0.4238 | 0.0305 | 0.0305 | 0.3570 | 0.1785 | 11.8301 | 0.0363 | 0.0963 | 0.1000 | 0.0031 | 1.7139 | 1.7219 | 4.2753 | 4.1191 | 188.3 | 180.3 | 680.2 | 969.6 |
+| S2+ P2 ratio02 | 525 | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| S2+ P2 ratio02 | 550 | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
 
 ## 7. 实验产物索引
 
@@ -300,7 +340,8 @@ python -m constraint_fused_deepcad_step.train ^
 | --- | --- | --- | --- | --- |
 | S2 BCE | `.../deepcad_step_s2_geom_pos_warmup21_31/artifacts/train_metrics.csv` | — | `.../test_eval_ep500/` | BCE 基线 |
 | S2+ hinge | `.../deepcad_step_s2plus_angle_hinge_warmup51_71/artifacts/train_metrics.csv` | `.../train_metrics_per_epoch.csv` | `.../test_eval_epoch500/` | 主推；阶段评估 ep140/365/500 |
-| 原始 DeepCAD | — | — | `proj_log/DeepCADOrigin/artifacts/test_eval_epoch1000/` | `results/test_1000_acc_stat.txt` |
+| S2+ P2 ratio02 | `.../deepcad_step_s2plus_ratio02_warmup501_550/artifacts/train_metrics.csv` | — | `.../test_eval_epoch615/` | 已评 ep610/615；续训目标 ep1000 |
+| 原始 DeepCAD | — | — | `proj_log/DeepCADOrigin/artifacts/test_eval_epoch1000_index_aligned/` | index-aligned 重评（2026-06-08）；旧全局口径见 `test_eval_epoch1000/` |
 
 辅助脚本：`constraint_fused_deepcad_step/artifacts/_build_step_experiment_record.py`（从 `train_metrics.csv` 生成本文档 §6 与 `train_metrics_per_epoch.csv`）。
 

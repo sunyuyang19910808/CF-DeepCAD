@@ -33,14 +33,27 @@ def save_ckpt(use_case, optimizer, scheduler, clock: TrainClock, cfg, name: str)
     return path
 
 
-def load_ckpt(use_case, optimizer, scheduler, clock: TrainClock, cfg) -> None:
-    ckpt_name = cfg.ckpt if cfg.ckpt == "latest" else "ckpt_epoch{}".format(cfg.ckpt)
-    repo = ModelCheckpointRepositoryFs(cfg.model_dir)
-    checkpoint = repo.load("{}.pth".format(ckpt_name), map_location=resolve_device(cfg))
+def _apply_checkpoint(use_case, optimizer, scheduler, clock: TrainClock, checkpoint) -> None:
     use_case.load_state_dict(checkpoint["model_state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
     clock.restore_checkpoint(checkpoint["clock"])
+
+
+def load_ckpt(use_case, optimizer, scheduler, clock: TrainClock, cfg) -> None:
+    ckpt_name = cfg.ckpt if cfg.ckpt == "latest" else "ckpt_epoch{}".format(cfg.ckpt)
+    repo = ModelCheckpointRepositoryFs(cfg.model_dir)
+    checkpoint = repo.load("{}.pth".format(ckpt_name), map_location=resolve_device(cfg))
+    _apply_checkpoint(use_case, optimizer, scheduler, clock, checkpoint)
+
+
+def load_init_ckpt(use_case, optimizer, scheduler, clock: TrainClock, cfg) -> None:
+    path = os.path.abspath(cfg.init_ckpt_path)
+    if not os.path.isfile(path):
+        raise FileNotFoundError("init_ckpt_path not found: {}".format(path))
+    checkpoint = torch.load(path, map_location=resolve_device(cfg))
+    _apply_checkpoint(use_case, optimizer, scheduler, clock, checkpoint)
+    clock.epoch += 1
 
 
 def _scalar(value):
@@ -58,9 +71,13 @@ def main() -> None:
     scheduler = GradualWarmupScheduler(optimizer, 1.0, cfg.warmup_step)
     clock = TrainClock()
 
-    if cfg.cont:
+    if cfg.init_ckpt_path:
+        load_init_ckpt(use_case, optimizer, scheduler, clock, cfg)
+    elif cfg.cont:
         try:
             load_ckpt(use_case, optimizer, scheduler, clock, cfg)
+            if str(cfg.ckpt).isdigit():
+                clock.epoch = int(cfg.ckpt) + 1
         except FileNotFoundError:
             pass
 

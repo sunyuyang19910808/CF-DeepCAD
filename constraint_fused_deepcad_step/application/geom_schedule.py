@@ -52,7 +52,14 @@ def resolve_target_geom_ratio(cfg, epoch: int) -> float:
     target = float(getattr(cfg, "geom_target_ratio", 0.0))
     if target <= 0.0:
         return 0.0
-    return target * _warmup_progress(cfg, epoch)
+    warmup_start = int(getattr(cfg, "geom_warmup_start_epoch", 1))
+    progress = _warmup_progress(cfg, epoch)
+    if epoch < warmup_start:
+        return 0.0
+    ratio_start = float(getattr(cfg, "geom_target_ratio_start", 0.0))
+    if ratio_start > 0.0:
+        return ratio_start + (target - ratio_start) * progress
+    return target * progress
 
 
 @dataclass
